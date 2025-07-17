@@ -17,40 +17,51 @@ function parseHtml(html) {
   const allDests = new Set();
 
   tables.forEach(table => {
-  const caption = table.querySelector("caption");
-  const captionText = caption ? caption.innerText.toLowerCase() : "";
+    // Check table caption text for "Passenger"
+    const caption = table.querySelector("caption");
+    const captionText = caption ? caption.innerText.toLowerCase() : "";
 
-  if (!captionText.includes("passenger")) {
-    if (!caption && !hasPassengerHeading(table)) return;
-    if (caption && !captionText.includes("passenger")) return;
-  }
+    if (!captionText.includes("passenger")) {
+      if (!caption && !hasPassengerHeading(table)) return;
+      if (caption && !captionText.includes("passenger")) return;
+    }
 
-  const rows = table.querySelectorAll("tr");
-  rows.forEach((row, idx) => {
-    if (idx === 0) return;
-    const cols = row.querySelectorAll("td");
-    if (cols.length < 2) return;
+    const rows = table.querySelectorAll("tr");
+    rows.forEach((row, idx) => {
+      if (idx === 0) return; // skip header row
 
-    const airline = cols[0].innerText.trim();
-    // Skip cargo/freight airlines explicitly
-    if (/cargo|freight/i.test(airline)) return;
+      const cols = row.querySelectorAll("td");
+      if (cols.length < 2) return;
 
-    let destText = cols[1].innerText;
+      const airline = cols[0].innerText.trim();
 
-    destText = destText.replace(/\s*\[\d+\]\s*/g, ', ');
+      // Skip cargo/freight airlines explicitly
+      if (/cargo|freight/i.test(airline)) return;
 
-    const dests = destText
-      .split(/\n|,|;/)
-      .map(d => d.trim())
-      .filter(Boolean);
+      let destText = cols[1].innerText;
 
-    if (!airlineMap.has(airline)) airlineMap.set(airline, new Set());
-    dests.forEach(d => {
-      airlineMap.get(airline).add(d);
-      allDests.add(d);
+      // Skip rows where destination cell looks like runway or measurement info
+      if (/\b(feet|m|meter|runway|active|inactive|unknown)\b/i.test(destText)) return;
+
+      // Remove all bracketed citations including [number], [citation needed], etc.
+      destText = destText.replace(/\s*\[[^\]]*\]\s*/g, ', ');
+
+      // Remove parentheticals with dates or common notes
+      destText = destText.replace(/\([^)]*\d{4}[^)]*\)/g, '');
+      destText = destText.replace(/\([^)]*(resumes|ends|seasonal|begins|suspended|inactive)[^)]*\)/gi, '');
+
+      const dests = destText
+        .split(/\n|,|;/)
+        .map(d => d.trim())
+        .filter(Boolean);
+
+      if (!airlineMap.has(airline)) airlineMap.set(airline, new Set());
+      dests.forEach(d => {
+        airlineMap.get(airline).add(d);
+        allDests.add(d);
+      });
     });
   });
-});
 
   airlineMap.set("__ALL__", allDests);
   return airlineMap;
