@@ -1,7 +1,6 @@
 async function getWikipediaUrl(code) {
   const query = `airport ${code}`;
   const apiUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*`;
-
   const res = await fetch(apiUrl);
   const json = await res.json();
   const firstResult = json.query.search[0];
@@ -10,10 +9,10 @@ async function getWikipediaUrl(code) {
 }
 
 async function fetchDestinations(url) {
-  const proxy = "https://api.allorigins.hexlet.app/get?url=" + encodeURIComponent(url);
-  const response = await fetch(proxy);
-  const data = await response.json();
-  const html = data.contents;
+  const proxyUrl = "https://corsproxy.io/?" + encodeURIComponent(url);
+  const response = await fetch(proxyUrl);
+  if (!response.ok) throw new Error(`Failed to fetch: ${response.status}`);
+  const html = await response.text();
 
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, "text/html");
@@ -25,7 +24,7 @@ async function fetchDestinations(url) {
   tables.forEach(table => {
     const rows = table.querySelectorAll("tr");
     rows.forEach((row, idx) => {
-      if (idx === 0) return; // skip header
+      if (idx === 0) return;
       const cols = row.querySelectorAll("td");
       if (cols.length < 2) return;
 
