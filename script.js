@@ -20,14 +20,11 @@ function parseHtml(html) {
     const caption = table.querySelector("caption");
     const captionText = caption ? caption.innerText.toLowerCase() : "";
 
-    if (!captionText.includes("passenger")) {
-      if (!caption && !hasPassengerHeading(table)) return;
-      if (caption && !captionText.includes("passenger")) return;
-    }
+    if (captionText && !captionText.includes("passenger")) return;
 
     const rows = table.querySelectorAll("tr");
     rows.forEach((row, idx) => {
-      if (idx === 0) return; // header
+      if (idx === 0) return; // header row
 
       const cols = row.querySelectorAll("td");
       if (cols.length < 2) return;
@@ -35,22 +32,9 @@ function parseHtml(html) {
       const airline = cols[0].innerText.trim();
       let destText = cols[1].innerText;
 
-      // Skip cargo/freight airlines
-      if (/cargo|freight/i.test(airline)) return;
-
-      // Skip rows that look like years or numeric placeholders
-      if (/^\d{3,4}$/.test(airline) || !/[a-zA-Z]/.test(airline)) return;
-
-      // Skip rows that look like runway IDs (e.g. 13R/31L)
-      if (/^\d{2}[RLC]?\/\d{2}[RLC]?$/i.test(destText.trim())) return;
-
-      // Skip rows that look like runway lengths (e.g., 12,079 feet)
-      if (/^\d{2,},?\d*\s*feet/i.test(destText.trim())) return;
-
-      // Clean up text
-      destText = destText.replace(/\s*\[[^\]]*\]\s*/g, ', '); // remove [x]
-      destText = destText.replace(/\([^)]*\d{4}[^)]*\)/g, '');
-      destText = destText.replace(/\([^)]*(resumes|ends|seasonal|begins|suspended|inactive)[^)]*\)/gi, '');
+      // Clean up citation markers
+      destText = destText.replace(/\[[^\]]*\]/g, '');
+      destText = destText.replace(/\s+/g, ' ').trim();
 
       const dests = destText
         .split(/\n|,|;/)
@@ -69,18 +53,6 @@ function parseHtml(html) {
   return airlineMap;
 }
 
-function hasPassengerHeading(table) {
-  let el = table.previousElementSibling;
-  while (el) {
-    if (/^h[1-6]$/i.test(el.tagName)) {
-      if (el.innerText.toLowerCase().includes("passenger")) return true;
-      else return false;
-    }
-    el = el.previousElementSibling;
-  }
-  return false;
-}
-
 async function fetchDestinations(url) {
   const proxies = [
     "https://corsproxy.io/?",
@@ -89,10 +61,9 @@ async function fetchDestinations(url) {
     "https://api.allorigins.win/get?url="
   ];
 
-  let lastError = null;
   for (const proxy of proxies) {
     try {
-      const fetchUrl = proxy.includes("allorigins") ? proxy + encodeURIComponent(url) : proxy + encodeURIComponent(url);
+      const fetchUrl = proxy + encodeURIComponent(url);
       const response = await fetch(fetchUrl);
       if (!response.ok) throw new Error(`Failed to fetch: ${response.status}`);
 
@@ -105,13 +76,12 @@ async function fetchDestinations(url) {
       }
 
       return parseHtml(html);
-
     } catch (err) {
       console.warn(`Proxy failed: ${proxy}`, err);
-      lastError = err;
     }
   }
-  throw new Error(`All proxies failed: ${lastError}`);
+
+  throw new Error("All proxies failed");
 }
 
 function mergeAirlines(map1, map2) {
