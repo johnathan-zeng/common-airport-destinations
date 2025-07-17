@@ -1,5 +1,5 @@
 // Improvement: Ensure that empty common/only1/only2 render as '-' if empty, not a long string of codes
-// Fix: Handle the large set of destinations more compactly if needed
+// Fix: Detect and filter out invalid/non-IATA airport codes
 
 function renderDestinations(list) {
   if (!list || list.length === 0) return '-';
@@ -7,11 +7,20 @@ function renderDestinations(list) {
   return list.join(", ");
 }
 
+function isValidIATACode(code) {
+  return /^[A-Z]{3}$/.test(code);
+}
+
 async function compareDestinations() {
   const code1 = document.getElementById("code1").value.trim().toUpperCase();
   const code2 = document.getElementById("code2").value.trim().toUpperCase();
   const output = document.getElementById("output");
   output.innerHTML = "<p>Loading...</p>";
+
+  if (!isValidIATACode(code1) || !isValidIATACode(code2)) {
+    output.innerHTML = `<p style="color:red;">Invalid IATA codes entered. Please enter valid 3-letter airport codes.</p>`;
+    return;
+  }
 
   try {
     output.innerHTML = `<p>Finding Wikipedia pages for ${code1} and ${code2}...</p>`;
@@ -26,7 +35,16 @@ async function compareDestinations() {
       fetchDestinations(url2)
     ]);
 
-    const merged = mergeAirlines(map1, map2);
+    const merged = mergeAirlines(map1, map2).map(row => {
+      // Filter out destinations that are clearly not valid IATA codes (e.g., 4+ letters, numbers)
+      const clean = list => list.filter(code => isValidIATACode(code));
+      return {
+        ...row,
+        common: clean(row.common),
+        only1: clean(row.only1),
+        only2: clean(row.only2)
+      };
+    });
 
     if (!merged.length) {
       output.innerHTML = `<p>No data found for either airport.</p>`;
