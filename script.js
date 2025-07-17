@@ -20,24 +20,23 @@ function parseHtml(html) {
     const caption = table.querySelector("caption");
     const captionText = caption ? caption.innerText.toLowerCase() : "";
 
-    if (captionText && !captionText.includes("passenger")) return;
+    // Accept table if caption is missing or includes 'passenger'
+    if (caption && !captionText.includes("passenger")) return;
 
     const rows = table.querySelectorAll("tr");
     rows.forEach((row, idx) => {
-      if (idx === 0) return; // header row
-
       const cols = row.querySelectorAll("td");
       if (cols.length < 2) return;
 
       const airline = cols[0].innerText.trim();
       let destText = cols[1].innerText;
 
-      // Clean up citation markers
+      // Clean up citation markers like [21]
       destText = destText.replace(/\[[^\]]*\]/g, '');
       destText = destText.replace(/\s+/g, ' ').trim();
 
       const dests = destText
-        .split(/\n|,|;/)
+        .split(/,|\n|;/)
         .map(d => d.trim())
         .filter(Boolean);
 
@@ -106,6 +105,7 @@ function mergeAirlines(map1, map2) {
     }
   });
 
+  // Ensure "All Airlines" row is at the top
   const allIndex = result.findIndex(r => r.airline === "All Airlines");
   if (allIndex > -1) {
     const [allRow] = result.splice(allIndex, 1);
