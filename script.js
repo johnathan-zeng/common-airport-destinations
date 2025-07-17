@@ -1,10 +1,14 @@
+/**
+ * Full script.js: Fetch and compare airport destinations between two IATA codes
+ */
+
 async function getWikipediaUrl(code) {
-  const query = `airport ${code}`;
+  const query = `IATA airport code ${code}`;
   const apiUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*`;
   const res = await fetch(apiUrl);
   const json = await res.json();
   const firstResult = json.query.search[0];
-  if (!firstResult) throw new Error(`No Wikipedia page found for code: ${code}`);
+  if (!firstResult) throw new Error(`No Wikipedia page found for airport code: ${code}`);
   return `https://en.wikipedia.org/wiki/${encodeURIComponent(firstResult.title)}`;
 }
 
@@ -20,8 +24,8 @@ function parseHtml(html) {
     const caption = table.querySelector("caption");
     const captionText = caption ? caption.innerText.toLowerCase() : "";
 
-    // Only include tables with 'passenger' in the caption
-    if (!caption || !captionText.includes("passenger")) return;
+    // Allow tables with no caption or with 'passenger' or 'destination' in caption
+    if (caption && !captionText.includes("passenger") && !captionText.includes("destination")) return;
 
     const rows = table.querySelectorAll("tr");
     rows.forEach(row => {
@@ -29,13 +33,11 @@ function parseHtml(html) {
       if (cols.length < 2) return;
 
       const airline = cols[0].innerText.trim();
-      if (!airline || /^\d+$/.test(airline)) return; // skip numeric or invalid entries
+      if (!airline || /^\d+$/.test(airline)) return;
 
       let destText = cols[1].innerText;
 
-      // Remove citation markers like [21]
-      destText = destText.replace(/\[[^\]]*\]/g, '');
-      destText = destText.replace(/\s+/g, ' ').trim();
+      destText = destText.replace(/\[[^\]]*\]/g, '').replace(/\s+/g, ' ').trim();
 
       const dests = destText
         .split(/,|\n|;/)
@@ -76,13 +78,14 @@ async function fetchDestinations(url) {
         html = await response.text();
       }
 
-      return parseHtml(html);
+      const map = parseHtml(html);
+      if (map.size > 0) return map;
     } catch (err) {
       console.warn(`Proxy failed: ${proxy}`, err);
     }
   }
 
-  throw new Error("All proxies failed");
+  throw new Error("All proxies failed or no destinations found");
 }
 
 function mergeAirlines(map1, map2) {
@@ -97,24 +100,23 @@ function mergeAirlines(map1, map2) {
     const only1 = [...d1].filter(x => !d2.has(x));
     const only2 = [...d2].filter(x => !d1.has(x));
 
-    if (common.length || only1.length || only2.length) {
-      result.push({
-        airline: airline === "__ALL__" ? "All Airlines" : airline,
-        common: common.sort(),
-        only1: only1.sort(),
-        only2: only2.sort()
-      });
-    }
+    result.push({
+      airline: airline === "__ALL__" ? "All Airlines" : airline,
+      common: common.sort(),
+      only1: only1.sort(),
+      only2: only2.sort()
+    });
   });
 
-  // Ensure "All Airlines" row is at the top
-  const allIndex = result.findIndex(r => r.airline === "All Airlines");
-  if (allIndex > -1) {
-    const [allRow] = result.splice(allIndex, 1);
-    result.unshift(allRow);
-  }
+  result.sort((a, b) => (a.airline === "All Airlines" ? -1 : 0));
 
   return result;
+}
+
+function escapeHTML(str) {
+  return str.replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
 }
 
 async function compareDestinations() {
@@ -124,11 +126,13 @@ async function compareDestinations() {
   output.innerHTML = "<p>Loading...</p>";
 
   try {
+    output.innerHTML = `<p>Finding Wikipedia pages for ${code1} and ${code2}...</p>`;
     const [url1, url2] = await Promise.all([
       getWikipediaUrl(code1),
       getWikipediaUrl(code2)
     ]);
 
+    output.innerHTML = `<p>Fetching destination data...</p>`;
     const [map1, map2] = await Promise.all([
       fetchDestinations(url1),
       fetchDestinations(url2)
@@ -136,7 +140,18 @@ async function compareDestinations() {
 
     const merged = mergeAirlines(map1, map2);
 
-    let html = `<table><thead><tr>
+    if (!merged.length) {
+      output.innerHTML = `<p>No data found for either airport.</p>`;
+      return;
+    }
+
+    let html = `<style>
+      table { border-collapse: collapse; width: 100%; margin-top: 1em; }
+      th, td { border: 1px solid #ccc; padding: 4px 8px; text-align: left; }
+      th { background-color: #f0f0f0; }
+    </style>`;
+
+    html += `<table><thead><tr>
       <th>Airline</th>
       <th>Common Destinations</th>
       <th>Only at ${code1}</th>
@@ -145,10 +160,10 @@ async function compareDestinations() {
 
     merged.forEach(({ airline, common, only1, only2 }) => {
       html += `<tr>
-        <td>${airline}</td>
-        <td>${common.join(", ") || "-"}</td>
-        <td>${only1.join(", ") || "-"}</td>
-        <td>${only2.join(", ") || "-"}</td>
+        <td>${escapeHTML(airline)}</td>
+        <td>${escapeHTML(common.join(", ") || "-")}</td>
+        <td>${escapeHTML(only1.join(", ") || "-")}</td>
+        <td>${escapeHTML(only2.join(", ") || "-")}</td>
       </tr>`;
     });
 
