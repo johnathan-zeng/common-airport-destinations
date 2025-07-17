@@ -17,41 +17,40 @@ function parseHtml(html) {
   const allDests = new Set();
 
   tables.forEach(table => {
-    // Check table caption text for "Passenger"
-    const caption = table.querySelector("caption");
-    const captionText = caption ? caption.innerText.toLowerCase() : "";
+  const caption = table.querySelector("caption");
+  const captionText = caption ? caption.innerText.toLowerCase() : "";
 
-    // If caption doesn't mention "passenger", skip table
-    if (!captionText.includes("passenger")) {
-      // Alternatively, if no caption, check for preceding heading containing "Passenger"
-      if (!caption && !hasPassengerHeading(table)) return;
-      if (caption && !captionText.includes("passenger")) return;
-    }
+  if (!captionText.includes("passenger")) {
+    if (!caption && !hasPassengerHeading(table)) return;
+    if (caption && !captionText.includes("passenger")) return;
+  }
 
-    const rows = table.querySelectorAll("tr");
-    rows.forEach((row, idx) => {
-      if (idx === 0) return;
-      const cols = row.querySelectorAll("td");
-      if (cols.length < 2) return;
+  const rows = table.querySelectorAll("tr");
+  rows.forEach((row, idx) => {
+    if (idx === 0) return;
+    const cols = row.querySelectorAll("td");
+    if (cols.length < 2) return;
 
-      const airline = cols[0].innerText.trim();
-      let destText = cols[1].innerText;
+    const airline = cols[0].innerText.trim();
+    // Skip cargo/freight airlines explicitly
+    if (/cargo|freight/i.test(airline)) return;
 
-      // Remove ALL bracketed citations BEFORE splitting
-      destText = destText.replace(/\s*\[\d+\]\s*/g, ', ');
+    let destText = cols[1].innerText;
 
-      const dests = destText
-        .split(/\n|,|;/)
-        .map(d => d.trim())
-        .filter(Boolean);
+    destText = destText.replace(/\s*\[\d+\]\s*/g, ', ');
 
-      if (!airlineMap.has(airline)) airlineMap.set(airline, new Set());
-      dests.forEach(d => {
-        airlineMap.get(airline).add(d);
-        allDests.add(d);
-      });
+    const dests = destText
+      .split(/\n|,|;/)
+      .map(d => d.trim())
+      .filter(Boolean);
+
+    if (!airlineMap.has(airline)) airlineMap.set(airline, new Set());
+    dests.forEach(d => {
+      airlineMap.get(airline).add(d);
+      allDests.add(d);
     });
   });
+});
 
   airlineMap.set("__ALL__", allDests);
   return airlineMap;
