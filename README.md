@@ -20,9 +20,3 @@ This is a lightweight web tool that compares **passenger destinations** between 
 |----------------|---------------------|-------------|-------------|
 | All Airlines   | Beijing, Shanghai   | Sanya       | Harbin      |
 | Air China      | Chengdu             | Nanjing     | Urumqi      |
-
-### 🌐 Live Demo
-
-You can host it via **GitHub Pages** by uploading the files in this repo and enabling Pages in the repository settings.
-
-Example:
