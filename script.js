@@ -17,7 +17,6 @@ function parseHtml(html) {
   const allDests = new Set();
 
   tables.forEach(table => {
-    // Check table caption text for "Passenger"
     const caption = table.querySelector("caption");
     const captionText = caption ? caption.innerText.toLowerCase() : "";
 
@@ -28,7 +27,7 @@ function parseHtml(html) {
 
     const rows = table.querySelectorAll("tr");
     rows.forEach((row, idx) => {
-      if (idx === 0) return; // skip header row
+      if (idx === 0) return; // header
 
       const cols = row.querySelectorAll("td");
       if (cols.length < 2) return;
@@ -36,22 +35,20 @@ function parseHtml(html) {
       const airline = cols[0].innerText.trim();
       let destText = cols[1].innerText;
 
-      // Skip cargo/freight airlines explicitly
+      // Skip cargo/freight airlines
       if (/cargo|freight/i.test(airline)) return;
 
-      // Skip airline rows that are just numbers or lack letters (e.g. year rows)
+      // Skip rows that look like years or numeric placeholders
       if (/^\d{3,4}$/.test(airline) || !/[a-zA-Z]/.test(airline)) return;
 
-      // Skip rows where destination cell contains runway or measurement keywords
-      if (/\b(feet|meter|runway|active|inactive|unknown)\b/i.test(destText)) return;
+      // Skip rows that look like runway IDs (e.g. 13R/31L)
+      if (/^\d{2}[RLC]?\/\d{2}[RLC]?$/i.test(destText.trim())) return;
 
-      // Also skip if destination cell is very short and mostly digits/slashes (likely runway IDs)
-      if (/^[\d\/\s]+$/.test(destText.trim()) && destText.trim().length < 8) return;
+      // Skip rows that look like runway lengths (e.g., 12,079 feet)
+      if (/^\d{2,},?\d*\s*feet/i.test(destText.trim())) return;
 
-      // Remove bracketed citations including [citation needed]
-      destText = destText.replace(/\s*\[[^\]]*\]\s*/g, ', ');
-
-      // Remove parentheticals with dates or notes
+      // Clean up text
+      destText = destText.replace(/\s*\[[^\]]*\]\s*/g, ', '); // remove [x]
       destText = destText.replace(/\([^)]*\d{4}[^)]*\)/g, '');
       destText = destText.replace(/\([^)]*(resumes|ends|seasonal|begins|suspended|inactive)[^)]*\)/gi, '');
 
@@ -72,7 +69,6 @@ function parseHtml(html) {
   return airlineMap;
 }
 
-// Helper: check if a previous sibling heading contains "Passenger"
 function hasPassengerHeading(table) {
   let el = table.previousElementSibling;
   while (el) {
@@ -140,7 +136,6 @@ function mergeAirlines(map1, map2) {
     }
   });
 
-  // Move "All Airlines" to the front of the array
   const allIndex = result.findIndex(r => r.airline === "All Airlines");
   if (allIndex > -1) {
     const [allRow] = result.splice(allIndex, 1);
