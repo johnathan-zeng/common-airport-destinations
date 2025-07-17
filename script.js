@@ -10,7 +10,7 @@ async function getWikipediaUrl(code) {
 }
 
 async function fetchDestinations(url) {
-  const proxy = "https://api.allorigins.win/get?url=" + encodeURIComponent(url);
+  const proxy = "https://api.allorigins.hexlet.app/get?url=" + encodeURIComponent(url);
   const response = await fetch(proxy);
   const data = await response.json();
   const html = data.contents;
