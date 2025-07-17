@@ -17,6 +17,17 @@ function parseHtml(html) {
   const allDests = new Set();
 
   tables.forEach(table => {
+    // Check table caption text for "Passenger"
+    const caption = table.querySelector("caption");
+    const captionText = caption ? caption.innerText.toLowerCase() : "";
+
+    // If caption doesn't mention "passenger", skip table
+    if (!captionText.includes("passenger")) {
+      // Alternatively, if no caption, check for preceding heading containing "Passenger"
+      if (!caption && !hasPassengerHeading(table)) return;
+      if (caption && !captionText.includes("passenger")) return;
+    }
+
     const rows = table.querySelectorAll("tr");
     rows.forEach((row, idx) => {
       if (idx === 0) return;
@@ -44,6 +55,19 @@ function parseHtml(html) {
 
   airlineMap.set("__ALL__", allDests);
   return airlineMap;
+}
+
+// Helper: check if a previous sibling heading contains "Passenger"
+function hasPassengerHeading(table) {
+  let el = table.previousElementSibling;
+  while (el) {
+    if (/^h[1-6]$/i.test(el.tagName)) {
+      if (el.innerText.toLowerCase().includes("passenger")) return true;
+      else return false;
+    }
+    el = el.previousElementSibling;
+  }
+  return false;
 }
 
 async function fetchDestinations(url) {
