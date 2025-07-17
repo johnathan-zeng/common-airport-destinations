@@ -9,7 +9,7 @@ async function getWikipediaUrl(code) {
 }
 
 async function fetchDestinations(url) {
-  const proxyUrl = "https://corsproxy.io/?" + encodeURIComponent(url);
+  const proxyUrl = "https://api.allorigins.win/get?url=" + encodeURIComponent(url);
   const response = await fetch(proxyUrl);
   if (!response.ok) throw new Error(`Failed to fetch: ${response.status}`);
   const html = await response.text();
