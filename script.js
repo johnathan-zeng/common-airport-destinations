@@ -37,14 +37,11 @@ function parseHtml(html) {
   const allDests = new Set();
 
   tables.forEach(table => {
-    const headers = Array.from(table.querySelectorAll("th")).map(th =>
-      th.innerText.trim().toLowerCase()
-    );
+    const caption = table.querySelector("caption");
+    const captionText = caption ? caption.innerText.toLowerCase() : "";
 
-    const hasAirline = headers.some(h => h.includes("airline"));
-    const hasDest = headers.some(h => h.includes("destination"));
-
-    if (!(hasAirline && hasDest)) return;
+    // Only passenger tables
+    if (!caption || !captionText.includes("passenger")) return;
 
     const rows = table.querySelectorAll("tr");
     rows.forEach(row => {
@@ -73,7 +70,6 @@ function parseHtml(html) {
   airlineMap.set("__ALL__", allDests);
   return airlineMap;
 }
-
 
 async function fetchDestinations(url) {
   const proxies = [
@@ -156,15 +152,7 @@ async function compareDestinations() {
       fetchDestinations(url2)
     ]);
 
-    const merged = mergeAirlines(map1, map2).map(row => {
-      const clean = list => list.filter(d => typeof d === 'string' && d.length >= 3 && !/^\d+$/.test(d));
-      return {
-        ...row,
-        common: clean(row.common),
-        only1: clean(row.only1),
-        only2: clean(row.only2)
-      };
-    });
+    const merged = mergeAirlines(map1, map2);
 
     if (!merged.length) {
       output.innerHTML = `<p>No data found for either airport.</p>`;
