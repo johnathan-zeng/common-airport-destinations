@@ -26,7 +26,10 @@ function parseHtml(html) {
 
       const airline = cols[0].innerText.trim();
       const destText = cols[1].innerText.trim();
-      const dests = destText.split(/\n|,|;/).map(d => d.trim()).filter(Boolean);
+      const dests = destText
+        .split(/\n|,|;/)
+        .map(d => d.replace(/\[\d+\]/g, '').trim())  // remove [number] citations
+        .filter(Boolean);
 
       if (!airlineMap.has(airline)) airlineMap.set(airline, new Set());
       dests.forEach(d => {
