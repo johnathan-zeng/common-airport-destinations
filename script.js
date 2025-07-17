@@ -24,10 +24,14 @@ function parseHtml(html) {
       if (cols.length < 2) return;
 
       const airline = cols[0].innerText.trim();
-      const destText = cols[1].innerText.trim();
+      let destText = cols[1].innerText;
+
+      // Remove ALL bracketed citations BEFORE splitting
+      destText = destText.replace(/\s*\[\d+\]\s*/g, ', ');
+
       const dests = destText
         .split(/\n|,|;/)
-        .map(d => d.replace(/\[\d+\]/g, '').trim())  // remove bracketed citations anywhere
+        .map(d => d.trim())
         .filter(Boolean);
 
       if (!airlineMap.has(airline)) airlineMap.set(airline, new Set());
@@ -97,12 +101,12 @@ function mergeAirlines(map1, map2) {
     }
   });
 
-  // Sort result so "All Airlines" is first
-  result.sort((a, b) => {
-    if (a.airline === "All Airlines") return -1;
-    if (b.airline === "All Airlines") return 1;
-    return a.airline.localeCompare(b.airline);
-  });
+  // Move "All Airlines" to the front of the array
+  const allIndex = result.findIndex(r => r.airline === "All Airlines");
+  if (allIndex > -1) {
+    const [allRow] = result.splice(allIndex, 1);
+    result.unshift(allRow);
+  }
 
   return result;
 }
@@ -126,12 +130,12 @@ async function compareDestinations() {
 
     const merged = mergeAirlines(map1, map2);
 
-    let html = `<table><tr>
+    let html = `<table><thead><tr>
       <th>Airline</th>
       <th>Common Destinations</th>
       <th>Only at ${code1}</th>
       <th>Only at ${code2}</th>
-    </tr>`;
+    </tr></thead><tbody>`;
 
     merged.forEach(({ airline, common, only1, only2 }) => {
       html += `<tr>
@@ -142,7 +146,7 @@ async function compareDestinations() {
       </tr>`;
     });
 
-    html += `</table>`;
+    html += `</tbody></table>`;
     output.innerHTML = html;
   } catch (err) {
     output.innerHTML = `<p style="color:red;">Error: ${err.message}</p>`;
