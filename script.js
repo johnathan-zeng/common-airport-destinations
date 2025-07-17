@@ -6,7 +6,7 @@ async function getWikipediaUrl(code) {
   const firstResult = json.query.search[0];
   if (!firstResult) throw new Error(`No Wikipedia page found for code: ${code}`);
   return `https://en.wikipedia.org/wiki/${encodeURIComponent(firstResult.title)}`;
-}
+} 
 
 function parseHtml(html) {
   const parser = new DOMParser();
