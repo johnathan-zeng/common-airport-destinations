@@ -37,10 +37,14 @@ function parseHtml(html) {
   const allDests = new Set();
 
   tables.forEach(table => {
-    const caption = table.querySelector("caption");
-    const captionText = caption ? caption.innerText.toLowerCase() : "";
+    const headers = Array.from(table.querySelectorAll("th")).map(th =>
+      th.innerText.trim().toLowerCase()
+    );
 
-    if (!caption || !captionText.includes("passenger")) return;
+    const hasAirline = headers.some(h => h.includes("airline"));
+    const hasDest = headers.some(h => h.includes("destination"));
+
+    if (!(hasAirline && hasDest)) return;
 
     const rows = table.querySelectorAll("tr");
     rows.forEach(row => {
@@ -69,6 +73,7 @@ function parseHtml(html) {
   airlineMap.set("__ALL__", allDests);
   return airlineMap;
 }
+
 
 async function fetchDestinations(url) {
   const proxies = [
