@@ -8,12 +8,8 @@ async function getWikipediaUrl(code) {
   return `https://en.wikipedia.org/wiki/${encodeURIComponent(firstResult.title)}`;
 }
 
-async function fetchDestinations(url) {
-  const proxyUrl = "https://api.allorigins.win/get?url=" + encodeURIComponent(url);
-  const response = await fetch(proxyUrl);
-  if (!response.ok) throw new Error(`Failed to fetch: ${response.status}`);
-  const html = await response.text();
-
+// Parse the HTML and extract destinations (keep your original logic)
+function parseHtml(html) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, "text/html");
   const tables = doc.querySelectorAll("table.wikitable");
@@ -42,6 +38,42 @@ async function fetchDestinations(url) {
 
   airlineMap.set("__ALL__", allDests);
   return airlineMap;
+}
+
+async function fetchDestinations(url) {
+  const proxies = [
+    "https://corsproxy.io/?",
+    "https://api.codetabs.com/v1/proxy?quest=",
+    "https://thingproxy.freeboard.io/fetch/",
+    "https://api.allorigins.win/get?url="
+  ];
+
+  let lastError = null;
+  for (const proxy of proxies) {
+    try {
+      // Some proxies expect url encoded differently
+      const fetchUrl = proxy.includes("allorigins") ? proxy + encodeURIComponent(url) : proxy + encodeURIComponent(url);
+      const response = await fetch(fetchUrl);
+      if (!response.ok) throw new Error(`Failed to fetch: ${response.status}`);
+
+      let html;
+      if (proxy.includes("allorigins")) {
+        // allorigins returns JSON with .contents property
+        const json = await response.json();
+        html = json.contents;
+      } else {
+        html = await response.text();
+      }
+
+      return parseHtml(html);
+
+    } catch (err) {
+      console.warn(`Proxy failed: ${proxy}`, err);
+      lastError = err;
+      // Try next proxy
+    }
+  }
+  throw new Error(`All proxies failed: ${lastError}`);
 }
 
 function mergeAirlines(map1, map2) {
