@@ -34,19 +34,24 @@ function parseHtml(html) {
       if (cols.length < 2) return;
 
       const airline = cols[0].innerText.trim();
+      let destText = cols[1].innerText;
 
       // Skip cargo/freight airlines explicitly
       if (/cargo|freight/i.test(airline)) return;
 
-      let destText = cols[1].innerText;
+      // Skip airline rows that are just numbers or lack letters (e.g. year rows)
+      if (/^\d{3,4}$/.test(airline) || !/[a-zA-Z]/.test(airline)) return;
 
-      // Skip rows where destination cell looks like runway or measurement info
-      if (/\b(feet|m|meter|runway|active|inactive|unknown)\b/i.test(destText)) return;
+      // Skip rows where destination cell contains runway or measurement keywords
+      if (/\b(feet|meter|runway|active|inactive|unknown)\b/i.test(destText)) return;
 
-      // Remove all bracketed citations including [number], [citation needed], etc.
+      // Also skip if destination cell is very short and mostly digits/slashes (likely runway IDs)
+      if (/^[\d\/\s]+$/.test(destText.trim()) && destText.trim().length < 8) return;
+
+      // Remove bracketed citations including [citation needed]
       destText = destText.replace(/\s*\[[^\]]*\]\s*/g, ', ');
 
-      // Remove parentheticals with dates or common notes
+      // Remove parentheticals with dates or notes
       destText = destText.replace(/\([^)]*\d{4}[^)]*\)/g, '');
       destText = destText.replace(/\([^)]*(resumes|ends|seasonal|begins|suspended|inactive)[^)]*\)/gi, '');
 
