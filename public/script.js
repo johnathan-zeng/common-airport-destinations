@@ -1,4 +1,4 @@
-// Escape HTML helper for safe output
+// Escape HTML helper
 function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
@@ -17,6 +17,7 @@ async function getWikipediaUrl(code) {
 
     const json = await res.json();
     const firstResult = json.query?.search?.[0];
+
     if (!firstResult) throw new Error(`No Wikipedia page found for airport code: ${code}`);
 
     const title = firstResult.title;
@@ -27,88 +28,89 @@ async function getWikipediaUrl(code) {
   }
 }
 
-// Parse Wikipedia HTML and extract passenger destination tables only
+// Parse Wikipedia HTML, extract passenger destination tables only
 function parseHtml(html) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, "text/html");
 
-  // Find <h2> Airlines and destinations
+  // Step 1: find <h2> Airlines and destinations
   const h2s = [...doc.querySelectorAll("h2")];
-  const targetH2 = h2s.find(h2 =>
+  let targetH2 = h2s.find(h2 =>
     h2.id.toLowerCase() === "airlines_and_destinations" ||
     h2.textContent.toLowerCase().includes("airlines and destinations")
   );
-
   if (!targetH2) {
     console.warn("No <h2> 'Airlines and destinations' found");
     return new Map();
   }
 
-  // Try to find next heading of any level with 'passenger' in text after targetH2
+  // Step 2: find next <h3> Passenger after that h2
   let el = targetH2.nextElementSibling;
-  let targetPassengerHeading = null;
+  let targetH3 = null;
+  while (el) {
+    if (el.tagName === "H3" &&
+        (el.id.toLowerCase() === "passenger" || el.textContent.toLowerCase().includes("passenger"))) {
+      targetH3 = el;
+      break;
+    }
+    // stop if next <h2> found before <h3> passenger
+    if (el.tagName === "H2") break;
+    el = el.nextElementSibling;
+  }
 
-  while (el && el.tagName !== "H2") {  // stop if next <h2> (new section)
-    if (/^H[1-6]$/i.test(el.tagName)) {
-      if (el.textContent.toLowerCase().includes("passenger")) {
-        targetPassengerHeading = el;
-        break;
-      }
+  if (!targetH3) {
+    console.warn("No <h3> 'Passenger' found after Airlines and destinations");
+    return new Map();
+  }
+
+  // Step 3: collect all wikitable tables after <h3> Passenger until next heading
+  const tables = [];
+  el = targetH3.nextElementSibling;
+  while (el && !(/^H[1-6]$/i.test(el.tagName))) {
+    if (el.tagName === "TABLE" && el.classList.contains("wikitable")) {
+      tables.push(el);
     }
     el = el.nextElementSibling;
   }
 
-  let tables = [];
-
-  if (targetPassengerHeading) {
-    console.log(`Found heading '${targetPassengerHeading.textContent.trim()}' after Airlines and destinations`);
-
-    // Collect all wikitable tables after passenger heading until next heading
-    el = targetPassengerHeading.nextElementSibling;
-    while (el && !(/^H[1-6]$/i.test(el.tagName))) {
-      if (el.tagName === "TABLE" && el.classList.contains("wikitable")) {
-        tables.push(el);
-      }
-      el = el.nextElementSibling;
-    }
-
-    if (tables.length === 0) {
-      console.warn("No wikitable passenger tables found after 'Passenger' heading");
-      return new Map();
-    }
-  } else {
-    console.warn("No heading including 'Passenger' found after Airlines and destinations");
-    // Fallback: look for wikitable tables directly after Airlines and destinations until next heading
-    el = targetH2.nextElementSibling;
-    while (el && el.tagName !== "H2") {
-      if (el.tagName === "TABLE" && el.classList.contains("wikitable")) {
-        tables.push(el);
-      }
-      el = el.nextElementSibling;
-    }
-    if (tables.length === 0) {
-      console.warn("No wikitable tables found immediately after Airlines and destinations");
-      return new Map();
-    }
+  if (tables.length === 0) {
+    console.warn("No wikitable passenger tables found after <h3> Passenger");
+    return new Map();
   }
 
-  return parseTables(tables);
-}
-
-// Helper to parse tables into airlineMap
-function parseTables(tables) {
+  // Step 4: parse tables for airline and destinations, applying alphabetical reset filtering
   const airlineMap = new Map();
   const allDests = new Set();
 
-  tables.forEach((table, tableIndex) => {
-    const rows = table.querySelectorAll("tr");
+  tables.forEach((table) => {
+    const rows = [...table.querySelectorAll("tr")];
 
-    rows.forEach((row, idx) => {
-      if (idx === 0) return; // skip header row
+    let lastFirstChar = null;
+    const filteredRows = [];
 
+    for (let i = 1; i < rows.length; i++) { // skip header row at i=0
+      const row = rows[i];
       const cols = row.querySelectorAll("td");
-      if (cols.length < 2) return;
+      if (cols.length < 2) continue;
 
+      const airline = cols[0].textContent.trim();
+      if (!airline) continue;
+
+      const firstChar = airline[0].toUpperCase();
+
+      // If alphabetical reset detected, stop processing further rows for this table
+      if (lastFirstChar && firstChar < lastFirstChar) {
+        console.log(`Alphabetical reset detected at airline "${airline}", stopping row parsing for this table.`);
+        break;
+      }
+      lastFirstChar = firstChar;
+
+      filteredRows.push(row);
+    }
+
+    // Process filtered rows
+    filteredRows.forEach((row) => {
+      const cols = row.querySelectorAll("td");
       const airline = cols[0].textContent.trim();
       if (!airline || airline.length < 2) return;
 
