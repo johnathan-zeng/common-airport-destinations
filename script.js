@@ -1,25 +1,67 @@
-// Helper: Escape HTML for safe output
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
+async function fetchWithCorsProxy(url) {
+  const proxies = [
+    "https://api.allorigins.win/get?url=",
+    "https://corsproxy.io/?",
+    "https://api.codetabs.com/v1/proxy?quest=",
+    "https://thingproxy.freeboard.io/fetch/"
+  ];
+  
+  let lastError = null;
 
-// Helper: Finds the closest previous heading element before a table
-function getNearestHeadingText(table) {
-  let el = table.previousElementSibling;
-  let count = 0;
-  while (el && count < 5) {
-    if (/^H[1-6]$/i.test(el.tagName)) {
-      return el.textContent.trim();
+  for (const proxy of proxies) {
+    try {
+      const proxyUrl = proxy + encodeURIComponent(url);
+      const res = await fetch(proxyUrl, { method: 'GET' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      if (proxy.includes("allorigins")) {
+        const json = await res.json();
+        return json.contents;
+      }
+      return await res.text();
+
+    } catch (err) {
+      lastError = err;
     }
-    el = el.previousElementSibling;
-    count++;
   }
-  return "";
+  throw new Error(`All proxies failed: ${lastError?.message || 'Unknown error'}`);
 }
 
-// Parses the HTML string of a Wikipedia page, extracting passenger destination tables
+async function getWikipediaUrl(code) {
+  const directUrl = `https://en.wikipedia.org/wiki/${code.toUpperCase()}_airport`;
+
+  try {
+    const html = await fetchWithCorsProxy(directUrl);
+
+    if (html && html.length > 500 && html.includes("<title>")) {
+      return directUrl;
+    }
+    throw new Error("Direct page appears invalid");
+
+  } catch (directErr) {
+    console.warn(`Direct URL fetch failed for ${code}: ${directErr.message}`);
+
+    const query = `airport ${code}`;
+    const apiUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*`;
+    
+    try {
+      const res = await fetch(apiUrl);
+      if (!res.ok) throw new Error(`Wikipedia API error: ${res.status}`);
+      
+      const json = await res.json();
+      const firstResult = json.query?.search?.[0];
+      
+      if (!firstResult) {
+          throw new Error(`No Wikipedia page found for airport code: ${code}`);
+      }
+      
+      return `https://en.wikipedia.org/wiki/${encodeURIComponent(firstResult.title)}`;
+    } catch (searchErr) {
+      throw new Error(`Failed to search Wikipedia for ${code}: ${searchErr.message}`);
+    }
+  }
+}
+
 function parseHtml(html) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, "text/html");
@@ -31,21 +73,15 @@ function parseHtml(html) {
   tables.forEach(table => {
     const caption = table.querySelector("caption");
     const captionText = caption ? caption.textContent.toLowerCase() : "";
-    const nearestHeading = getNearestHeadingText(table).toLowerCase();
 
-    // Accept tables if caption or heading contain relevant keywords
-    if (
-      !captionText.includes("passenger") &&
-      !captionText.includes("airline") &&
-      !nearestHeading.includes("passenger") &&
-      !nearestHeading.includes("airline")
-    ) {
-      return; // Skip irrelevant tables
+    // Check for "Passenger" table or nearby heading containing "Passenger"
+    if (!captionText.includes("passenger") && !hasPassengerHeading(table)) {
+      return;
     }
 
     const rows = table.querySelectorAll("tr");
     rows.forEach((row, idx) => {
-      if (idx === 0) return; // Skip header row
+      if (idx === 0) return; // Skip header
 
       const cols = row.querySelectorAll("td");
       if (cols.length < 2) return;
@@ -55,34 +91,31 @@ function parseHtml(html) {
 
       let destText = cols[1].textContent || "";
 
-      // Clean destination text: remove footnotes, parentheses, normalize dashes and whitespace
       destText = destText
-        .replace(/\[\d+\]/g, '')             // remove citations like [1], [2]
-        .replace(/\([^)]+\)/g, '')           // remove parentheses content
-        .replace(/–/g, '-')                  // normalize dash characters
-        .replace(/\s{2,}/g, ' ')             // collapse multiple spaces
-        .trim();
+          .replace(/\[\d+\]/g, '')             
+          .replace(/\([^)]+\)/g, '')           
+          .replace(/–/g, '-')                  
+          .replace(/\s{2,}/g, ' ')             
+          .trim();
 
       const dests = destText
-        .split(/[\n,;·•]/)
-        .map(d => d.trim())
-        .filter(d =>
-          d.length >= 3 &&
-          d.length < 50 &&
-          !/^\d+$/.test(d) &&                // exclude pure numbers
-          !/[0-9]{3,}/.test(d) &&            // exclude long numeric fragments
-          !/^\d{2,}[a-z]?$/i.test(d) &&      // exclude things like "267" or "21A"
-          !/^(and|or|also|via|seasonal|charter|cargo|freight|terminated|suspended)$/i.test(d)
-        );
+          .split(/[\n,;·•]/)
+          .map(d => d.trim())
+          .filter(d =>
+              d.length >= 3 &&
+              d.length < 50 &&
+              !/^\d+$/.test(d) &&               
+              !/[0-9]{3,}/.test(d) &&           
+              !/^\d{2,}[a-z]?$/i.test(d) &&     
+              !/^(and|or|also|via|seasonal|charter|cargo|freight|terminated|suspended)$/i.test(d)
+          );
 
       if (dests.length > 0) {
-        console.log("Airline:", airline, "Destinations:", dests); // Debug log
-
-        if (!airlineMap.has(airline)) airlineMap.set(airline, new Set());
-        dests.forEach(d => {
-          airlineMap.get(airline).add(d);
-          allDests.add(d);
-        });
+          if (!airlineMap.has(airline)) airlineMap.set(airline, new Set());
+          dests.forEach(d => {
+              airlineMap.get(airline).add(d);
+              allDests.add(d);
+          });
       }
     });
   });
@@ -94,43 +127,31 @@ function parseHtml(html) {
   return airlineMap;
 }
 
-// Fetch Wikipedia URL for given airport code via search API
-async function getWikipediaUrl(code) {
-  const query = `airport ${code}`;
-  const apiUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*`;
-
-  try {
-    const res = await fetch(apiUrl);
-    if (!res.ok) throw new Error(`Wikipedia API error: ${res.status}`);
-
-    const json = await res.json();
-    const firstResult = json.query?.search?.[0];
-
-    if (!firstResult) {
-      throw new Error(`No Wikipedia page found for airport code: ${code}`);
+function hasPassengerHeading(table) {
+  let el = table.previousElementSibling;
+  let count = 0;
+  while (el && count < 5) {
+    if (/^H[1-6]$/i.test(el.tagName)) {
+      return el.textContent.toLowerCase().includes("passenger");
     }
-
-    return `https://en.wikipedia.org/wiki/${encodeURIComponent(firstResult.title)}`;
-  } catch (err) {
-    throw new Error(`Failed to search Wikipedia for ${code}: ${err.message}`);
+    el = el.previousElementSibling;
+    count++;
   }
+  return false;
 }
 
-// Attempt to fetch HTML through a list of CORS proxies, return parsed airline data
 async function fetchDestinations(url) {
   const proxies = [
     { url: "https://api.allorigins.win/get?url=", isJson: true },
     { url: "https://corsproxy.io/?", isJson: false },
     { url: "https://api.codetabs.com/v1/proxy?quest=", isJson: false },
-    { url: "https://thingproxy.freeboard.io/fetch/", isJson: false },
-    // Add your own proxy if needed, with or without API keys
+    { url: "https://thingproxy.freeboard.io/fetch/", isJson: false }
   ];
 
   let lastError = null;
 
   for (const proxy of proxies) {
     try {
-      console.log(`Trying proxy: ${proxy.url}`); // Debug log
       const proxyUrl = proxy.url + encodeURIComponent(url);
       const res = await fetch(proxyUrl, {
         headers: {
@@ -155,7 +176,7 @@ async function fetchDestinations(url) {
       else throw new Error('No destination data found in page');
 
     } catch (err) {
-      console.warn(`Proxy failed (${proxy.url}):`, err.message);
+      console.warn(`Proxy failed (${proxy.url}): ${err.message}`);
       lastError = err;
     }
   }
@@ -163,7 +184,6 @@ async function fetchDestinations(url) {
   throw new Error(`All proxies failed. Last error: ${lastError?.message || 'Unknown error'}`);
 }
 
-// Merge airline maps from two airports into comparison arrays
 function mergeAirlines(map1, map2) {
   const airlineSet = new Set([...map1.keys(), ...map2.keys()]);
   const result = [];
@@ -186,7 +206,7 @@ function mergeAirlines(map1, map2) {
     }
   });
 
-  // Move "All Airlines" to front
+  // Move "All Airlines" to the front
   const allIndex = result.findIndex(r => r.airline === "All Airlines");
   if (allIndex > -1) {
     const [allRow] = result.splice(allIndex, 1);
@@ -200,24 +220,20 @@ function mergeAirlines(map1, map2) {
   });
 }
 
-// Main function to compare destinations between two airport codes
 async function compareDestinations() {
   const code1 = document.getElementById("code1").value.trim().toUpperCase();
   const code2 = document.getElementById("code2").value.trim().toUpperCase();
   const output = document.getElementById("output");
   const button = document.querySelector("button");
 
-  // Validate input
   if (!code1 || !code2) {
     output.innerHTML = '<div class="error">Please enter both airport codes.</div>';
     return;
   }
-
   if (code1.length < 3 || code2.length < 3) {
-    output.innerHTML = '<div class="error">Please enter valid airport codes (3+ characters).</div>';
+    output.innerHTML = '<div class="error">Please enter valid 3-letter airport codes.</div>';
     return;
   }
-
   if (code1 === code2) {
     output.innerHTML = '<div class="error">Please enter two different airport codes.</div>';
     return;
@@ -251,7 +267,6 @@ async function compareDestinations() {
       return;
     }
 
-    // Build results table
     let html = `
       <h3>Destination Comparison: ${code1} vs ${code2}</h3>
       <table>
@@ -291,20 +306,24 @@ async function compareDestinations() {
 
   } catch (err) {
     console.error('Error:', err);
-    output.innerHTML = `<div class="error">Error: ${escapeHtml(err.message)}</div>`;
+    output.innerHTML = `<div class="error">Error: ${err.message}</div>`;
   } finally {
     button.disabled = false;
   }
 }
 
-// Add Enter key support to inputs
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// Enter key triggers compare
 document.addEventListener('DOMContentLoaded', () => {
   const inputs = document.querySelectorAll('input[type="text"]');
   inputs.forEach(input => {
     input.addEventListener('keypress', e => {
-      if (e.key === 'Enter') {
-        compareDestinations();
-      }
+      if (e.key === 'Enter') compareDestinations();
     });
   });
 });
