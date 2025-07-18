@@ -1,4 +1,4 @@
-// Escape HTML helper
+// Escape HTML helper for safe output
 function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
@@ -17,7 +17,6 @@ async function getWikipediaUrl(code) {
 
     const json = await res.json();
     const firstResult = json.query?.search?.[0];
-
     if (!firstResult) throw new Error(`No Wikipedia page found for airport code: ${code}`);
 
     const title = firstResult.title;
@@ -28,81 +27,76 @@ async function getWikipediaUrl(code) {
   }
 }
 
-// Check if a heading before the table mentions "passenger"
-function hasPassengerHeading(table) {
-  let el = table.previousElementSibling;
-  let count = 0;
-  while (el && count < 5) {
-    if (/^H[1-6]$/i.test(el.tagName)) {
-      return el.textContent.toLowerCase().includes("passenger");
-    }
-    el = el.previousElementSibling;
-    count++;
-  }
-  return false;
-}
-
-// Parse Wikipedia HTML, extract passenger destination tables only
+// Parse Wikipedia HTML and extract passenger destination tables only
 function parseHtml(html) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, "text/html");
 
-  // Step 1: find <h2> Airlines and destinations
+  // Find <h2> Airlines and destinations
   const h2s = [...doc.querySelectorAll("h2")];
-  let targetH2 = h2s.find(h2 =>
+  const targetH2 = h2s.find(h2 =>
     h2.id.toLowerCase() === "airlines_and_destinations" ||
     h2.textContent.toLowerCase().includes("airlines and destinations")
   );
+
   if (!targetH2) {
     console.warn("No <h2> 'Airlines and destinations' found");
     return new Map();
   }
 
-  // After finding targetH2 (Airlines and destinations)
+  // Try to find next heading of any level with 'passenger' in text after targetH2
   let el = targetH2.nextElementSibling;
-  console.log("Headings after Airlines and destinations:");
-  while (el && el.tagName !== "H2") {
+  let targetPassengerHeading = null;
+
+  while (el && el.tagName !== "H2") {  // stop if next <h2> (new section)
     if (/^H[1-6]$/i.test(el.tagName)) {
-      console.log(`${el.tagName} : "${el.textContent.trim()}"`);
+      if (el.textContent.toLowerCase().includes("passenger")) {
+        targetPassengerHeading = el;
+        break;
+      }
     }
     el = el.nextElementSibling;
   }
-  
-  // Reassign without `let`
-  el = targetH2.nextElementSibling;
-  let targetH3 = null;
-  while (el) {
-    if (el.tagName === "H3" && 
-        (el.id.toLowerCase() === "passenger" || el.textContent.toLowerCase().includes("passenger"))) {
-      targetH3 = el;
-      break;
-    }
-    if (el.tagName === "H2") break;
-    el = el.nextElementSibling;
-  }
 
-
-  if (!targetH3) {
-    console.warn("No <h3> 'Passenger' found after Airlines and destinations");
-    return new Map();
-  }
-
-  // Step 3: collect all wikitable tables after <h3> Passenger until next heading
   let tables = [];
-  el = targetH3.nextElementSibling;
-  while (el && !(/^H[1-6]$/i.test(el.tagName))) {
-    if (el.tagName === "TABLE" && el.classList.contains("wikitable")) {
-      tables.push(el);
+
+  if (targetPassengerHeading) {
+    console.log(`Found heading '${targetPassengerHeading.textContent.trim()}' after Airlines and destinations`);
+
+    // Collect all wikitable tables after passenger heading until next heading
+    el = targetPassengerHeading.nextElementSibling;
+    while (el && !(/^H[1-6]$/i.test(el.tagName))) {
+      if (el.tagName === "TABLE" && el.classList.contains("wikitable")) {
+        tables.push(el);
+      }
+      el = el.nextElementSibling;
     }
-    el = el.nextElementSibling;
+
+    if (tables.length === 0) {
+      console.warn("No wikitable passenger tables found after 'Passenger' heading");
+      return new Map();
+    }
+  } else {
+    console.warn("No heading including 'Passenger' found after Airlines and destinations");
+    // Fallback: look for wikitable tables directly after Airlines and destinations until next heading
+    el = targetH2.nextElementSibling;
+    while (el && el.tagName !== "H2") {
+      if (el.tagName === "TABLE" && el.classList.contains("wikitable")) {
+        tables.push(el);
+      }
+      el = el.nextElementSibling;
+    }
+    if (tables.length === 0) {
+      console.warn("No wikitable tables found immediately after Airlines and destinations");
+      return new Map();
+    }
   }
 
-  if (tables.length === 0) {
-    console.warn("No wikitable passenger tables found after <h3> Passenger");
-    return new Map();
-  }
+  return parseTables(tables);
+}
 
-  // Now parse the tables for airline and destinations as before
+// Helper to parse tables into airlineMap
+function parseTables(tables) {
   const airlineMap = new Map();
   const allDests = new Set();
 
@@ -157,7 +151,6 @@ function parseHtml(html) {
 
   return airlineMap;
 }
-
 
 // Try multiple public CORS proxies in sequence until success
 async function fetchDestinations(url) {
