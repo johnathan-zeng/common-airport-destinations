@@ -67,10 +67,9 @@ function parseHtml(html) {
     }
     el = el.nextElementSibling;
   }
-
   
-  // Step 2: find next <h3> Passenger after that h2
-  let el = targetH2.nextElementSibling;
+  // Reassign without `let`
+  el = targetH2.nextElementSibling;
   let targetH3 = null;
   while (el) {
     if (el.tagName === "H3" && 
@@ -78,10 +77,10 @@ function parseHtml(html) {
       targetH3 = el;
       break;
     }
-    // stop if next <h2> found before <h3> passenger
     if (el.tagName === "H2") break;
     el = el.nextElementSibling;
   }
+
 
   if (!targetH3) {
     console.warn("No <h3> 'Passenger' found after Airlines and destinations");
