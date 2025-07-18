@@ -10,6 +10,8 @@ async function getWikipediaUrl(code) {
   const query = `airport ${code}`;
   const apiUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*`;
 
+  console.log(`Searching Wikipedia for airport code: ${code}`);
+
   try {
     const res = await fetch(apiUrl);
     if (!res.ok) throw new Error(`Wikipedia API error: ${res.status}`);
@@ -23,6 +25,7 @@ async function getWikipediaUrl(code) {
     console.log(`Found Wikipedia page for ${code}: ${title}`);
     return `https://en.wikipedia.org/wiki/${encodeURIComponent(title)}`;
   } catch (err) {
+    console.error(`Failed to search Wikipedia for ${code}: ${err.message}`);
     throw new Error(`Failed to search Wikipedia for ${code}: ${err.message}`);
   }
 }
@@ -33,21 +36,25 @@ function parseHtml(html) {
   const doc = parser.parseFromString(html, "text/html");
   const tables = doc.querySelectorAll("table.wikitable");
 
+  console.log(`Parsing HTML: found ${tables.length} wikitable elements`);
+
   const airlineMap = new Map();
   const allDests = new Set();
 
-  tables.forEach((table) => {
+  tables.forEach((table, i) => {
     const caption = table.querySelector("caption");
     const captionText = caption ? caption.textContent.toLowerCase() : "";
 
     if (!captionText.includes("passenger") && !hasPassengerHeading(table)) {
+      console.log(`Skipping table ${i} - no 'passenger' caption or heading`);
       return;
     }
 
     const rows = table.querySelectorAll("tr");
+    console.log(`Processing table ${i} with ${rows.length} rows`);
 
     rows.forEach((row, idx) => {
-      if (idx === 0) return;
+      if (idx === 0) return; // skip header
 
       const cols = row.querySelectorAll("td");
       if (cols.length < 2) return;
@@ -82,12 +89,16 @@ function parseHtml(html) {
           airlineMap.get(airline).add(d);
           allDests.add(d);
         });
+        console.log(`Table ${i} Row ${idx}: Airline '${airline}' with destinations: ${dests.join(", ")}`);
       }
     });
   });
 
   if (allDests.size > 0) {
     airlineMap.set("__ALL__", allDests);
+    console.log(`Collected total unique destinations: ${allDests.size}`);
+  } else {
+    console.warn("No passenger destination data extracted from HTML");
   }
 
   return airlineMap;
@@ -121,7 +132,7 @@ async function fetchDestinations(url) {
   for (const proxy of proxies) {
     try {
       const proxyUrl = proxy + encodeURIComponent(url);
-      console.log(`Trying proxy: ${proxy}`);
+      console.log(`Trying proxy: ${proxy} for URL: ${url}`);
 
       const res = await fetch(proxyUrl);
       if (!res.ok) throw new Error(`HTTP ${res.status} at proxy: ${proxy}`);
@@ -137,7 +148,10 @@ async function fetchDestinations(url) {
       if (!html || html.length < 100) throw new Error('Empty or invalid response');
 
       const parsed = parseHtml(html);
-      if (parsed.size > 0) return parsed;
+      if (parsed.size > 0) {
+        console.log(`Successfully parsed destinations via proxy: ${proxy}`);
+        return parsed;
+      }
 
       throw new Error('No destination data found in page');
     } catch (err) {
@@ -213,10 +227,14 @@ async function compareDestinations() {
     // Search Wikipedia for each airport page URL
     const [url1, url2] = await Promise.all([getWikipediaUrl(code1), getWikipediaUrl(code2)]);
 
+    console.log(`Got Wikipedia URLs:\n${code1}: ${url1}\n${code2}: ${url2}`);
+
     output.innerHTML = `<div class="loading">Fetching destination data...</div>`;
 
     // Fetch and parse destination tables
     const [map1, map2] = await Promise.all([fetchDestinations(url1), fetchDestinations(url2)]);
+
+    console.log(`Parsed destination maps sizes: ${map1.size}, ${map2.size}`);
 
     if (map1.size === 0 && map2.size === 0) {
       output.innerHTML = `<div class="error">No passenger destination data found for either airport.</div>`;
