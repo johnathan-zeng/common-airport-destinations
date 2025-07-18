@@ -58,6 +58,17 @@ function parseHtml(html) {
     return new Map();
   }
 
+  // After finding targetH2 (Airlines and destinations)
+  let el = targetH2.nextElementSibling;
+  console.log("Headings after Airlines and destinations:");
+  while (el && el.tagName !== "H2") {
+    if (/^H[1-6]$/i.test(el.tagName)) {
+      console.log(`${el.tagName} : "${el.textContent.trim()}"`);
+    }
+    el = el.nextElementSibling;
+  }
+
+  
   // Step 2: find next <h3> Passenger after that h2
   let el = targetH2.nextElementSibling;
   let targetH3 = null;
