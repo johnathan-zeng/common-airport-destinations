@@ -119,8 +119,10 @@ function hasPassengerHeading(table) {
 }
 
 // Try multiple public CORS proxies in sequence until success
+const myProxyBaseUrl = 'https://your-vercel-project.vercel.app/api/proxy?url=';
+
 async function fetchDestinations(url) {
-  const proxies = [
+  const publicProxies = [
     "https://api.allorigins.win/get?url=",
     "https://corsproxy.io/?",
     "https://api.codetabs.com/v1/proxy?quest=",
@@ -129,10 +131,31 @@ async function fetchDestinations(url) {
 
   let lastError = null;
 
-  for (const proxy of proxies) {
+  // Try your own proxy first
+  try {
+    const proxyUrl = myProxyBaseUrl + encodeURIComponent(url);
+    console.log(`Trying my Vercel proxy: ${proxyUrl}`);
+
+    const res = await fetch(proxyUrl);
+    if (!res.ok) throw new Error(`HTTP ${res.status} at my proxy`);
+
+    const html = await res.text();
+    if (!html || html.length < 100) throw new Error('Empty or invalid response from my proxy');
+
+    const parsed = parseHtml(html);
+    if (parsed.size > 0) return parsed;
+
+    throw new Error('No destination data found in page via my proxy');
+  } catch (err) {
+    console.warn(`My proxy failed: ${err.message}`);
+    lastError = err;
+  }
+
+  // If my proxy fails, try public proxies in order
+  for (const proxy of publicProxies) {
     try {
       const proxyUrl = proxy + encodeURIComponent(url);
-      console.log(`Trying proxy: ${proxy} for URL: ${url}`);
+      console.log(`Trying public proxy: ${proxy}`);
 
       const res = await fetch(proxyUrl);
       if (!res.ok) throw new Error(`HTTP ${res.status} at proxy: ${proxy}`);
@@ -148,14 +171,11 @@ async function fetchDestinations(url) {
       if (!html || html.length < 100) throw new Error('Empty or invalid response');
 
       const parsed = parseHtml(html);
-      if (parsed.size > 0) {
-        console.log(`Successfully parsed destinations via proxy: ${proxy}`);
-        return parsed;
-      }
+      if (parsed.size > 0) return parsed;
 
       throw new Error('No destination data found in page');
     } catch (err) {
-      console.warn(`Proxy failed (${proxy}): ${err.message}`);
+      console.warn(`Public proxy failed (${proxy}): ${err.message}`);
       lastError = err;
     }
   }
