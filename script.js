@@ -119,7 +119,7 @@ function hasPassengerHeading(table) {
 }
 
 // Try multiple public CORS proxies in sequence until success
-const myProxyBaseUrl = 'https://your-vercel-project.vercel.app/api/proxy?url=';
+const myProxyBaseUrl = 'https://common-airport-destinations.vercel.app/api/proxy?url=';
 
 async function fetchDestinations(url) {
   const publicProxies = [
