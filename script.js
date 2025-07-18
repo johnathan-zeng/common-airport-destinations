@@ -87,50 +87,43 @@ async function fetchDestinations(url) {
         { url: "https://api.allorigins.win/get?url=", isJson: true },
         { url: "https://corsproxy.io/?", isJson: false },
         { url: "https://api.codetabs.com/v1/proxy?quest=", isJson: false },
-        { url: "https://thingproxy.freeboard.io/fetch/", isJson: false }
+        { url: "https://thingproxy.freeboard.io/fetch/", isJson: false },
+        { url: "https://proxy.cors.sh/", isJson: false } // Needs API key if rate-limited
     ];
 
     let lastError = null;
-    
+
     for (const proxy of proxies) {
         try {
-            const fetchUrl = proxy.url + encodeURIComponent(url);
-            const response = await fetch(fetchUrl, {
-                method: 'GET',
+            const proxyUrl = proxy.url + encodeURIComponent(url);
+            const res = await fetch(proxyUrl, {
                 headers: {
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
                 }
             });
-            
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
+
+            if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
 
             let html;
             if (proxy.isJson) {
-                const json = await response.json();
+                const json = await res.json();
                 html = json.contents;
             } else {
-                html = await response.text();
+                html = await res.text();
             }
 
-            if (!html || html.length < 100) {
-                throw new Error('Empty or invalid response');
-            }
+            if (!html || html.length < 100) throw new Error('Empty or invalid response');
 
-            const result = parseHtml(html);
-            if (result.size > 0) {
-                return result;
-            } else {
-                throw new Error('No destination data found in page');
-            }
+            const parsed = parseHtml(html);
+            if (parsed.size > 0) return parsed;
+            else throw new Error('No destination data found in page');
 
         } catch (err) {
-            console.warn(`Proxy failed: ${proxy.url}`, err);
+            console.warn(`Proxy failed (${proxy.url}):`, err.message);
             lastError = err;
         }
     }
-    
+
     throw new Error(`All proxies failed. Last error: ${lastError?.message || 'Unknown error'}`);
 }
 
