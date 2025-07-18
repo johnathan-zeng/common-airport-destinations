@@ -46,53 +46,75 @@ function hasPassengerHeading(table) {
 function parseHtml(html) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, "text/html");
-  const tables = doc.querySelectorAll("table.wikitable");
-  console.log(`Parsing HTML: found ${tables.length} wikitable elements`);
 
+  // Step 1: find <h2> Airlines and destinations
+  const h2s = [...doc.querySelectorAll("h2")];
+  let targetH2 = h2s.find(h2 =>
+    h2.id.toLowerCase() === "airlines_and_destinations" ||
+    h2.textContent.toLowerCase().includes("airlines and destinations")
+  );
+  if (!targetH2) {
+    console.warn("No <h2> 'Airlines and destinations' found");
+    return new Map();
+  }
+
+  // Step 2: find next <h3> Passenger after that h2
+  let el = targetH2.nextElementSibling;
+  let targetH3 = null;
+  while (el) {
+    if (el.tagName === "H3" && 
+        (el.id.toLowerCase() === "passenger" || el.textContent.toLowerCase().includes("passenger"))) {
+      targetH3 = el;
+      break;
+    }
+    // stop if next <h2> found before <h3> passenger
+    if (el.tagName === "H2") break;
+    el = el.nextElementSibling;
+  }
+
+  if (!targetH3) {
+    console.warn("No <h3> 'Passenger' found after Airlines and destinations");
+    return new Map();
+  }
+
+  // Step 3: collect all wikitable tables after <h3> Passenger until next heading
+  let tables = [];
+  el = targetH3.nextElementSibling;
+  while (el && !(/^H[1-6]$/i.test(el.tagName))) {
+    if (el.tagName === "TABLE" && el.classList.contains("wikitable")) {
+      tables.push(el);
+    }
+    el = el.nextElementSibling;
+  }
+
+  if (tables.length === 0) {
+    console.warn("No wikitable passenger tables found after <h3> Passenger");
+    return new Map();
+  }
+
+  // Now parse the tables for airline and destinations as before
   const airlineMap = new Map();
   const allDests = new Set();
 
-  tables.forEach((table, index) => {
-    const caption = table.querySelector("caption");
-    const captionText = caption ? caption.textContent.toLowerCase() : "";
-    console.log(`Table ${index} caption: "${captionText}"`);
-
-    if (!captionText.includes("passenger")) {
-      if (hasPassengerHeading(table)) {
-        console.log(`Table ${index} accepted due to passenger heading`);
-      } else {
-        console.log(`Skipping table ${index} - no 'passenger' caption or heading`);
-        return;
-      }
-    } else {
-      console.log(`Table ${index} accepted due to passenger caption`);
-    }
-
+  tables.forEach((table, tableIndex) => {
     const rows = table.querySelectorAll("tr");
-    console.log(`Table ${index} has ${rows.length} rows`);
 
     rows.forEach((row, idx) => {
       if (idx === 0) return; // skip header row
 
       const cols = row.querySelectorAll("td");
-      if (cols.length < 2) {
-        console.log(`Table ${index} row ${idx} skipped - not enough columns`);
-        return;
-      }
+      if (cols.length < 2) return;
 
       const airline = cols[0].textContent.trim();
-      if (!airline || airline.length < 2) {
-        console.log(`Table ${index} row ${idx} skipped - invalid airline name`);
-        return;
-      }
+      if (!airline || airline.length < 2) return;
 
       let destText = cols[1].textContent || "";
 
       destText = destText
-        .replace(/\[\d+\]/g, '') // remove references like [1]
-        .replace(/\([^)]+\)/g, '') // remove text in parentheses
-        .replace(/–/g, '-') // replace special dashes
-        .replace(/\s{2,}/g, ' ') // collapse spaces
+        .replace(/\[\d+\]/g, '')      // remove references
+        .replace(/\([^)]+\)/g, '')    // remove parentheses content
+        .replace(/–/g, '-')           // normalize dash
+        .replace(/\s{2,}/g, ' ')      // collapse spaces
         .trim();
 
       const dests = destText
@@ -113,9 +135,6 @@ function parseHtml(html) {
           airlineMap.get(airline).add(d);
           allDests.add(d);
         });
-        console.log(`Table ${index} row ${idx} airline: "${airline}" destinations: ${dests.join(", ")}`);
-      } else {
-        console.log(`Table ${index} row ${idx} airline: "${airline}" - no valid destinations after filtering`);
       }
     });
   });
@@ -124,10 +143,11 @@ function parseHtml(html) {
     airlineMap.set("__ALL__", allDests);
   }
 
-  console.log(`Total unique destinations extracted: ${allDests.size}`);
+  console.log(`Parsed ${tables.length} tables, extracted ${allDests.size} unique destinations`);
 
   return airlineMap;
 }
+
 
 // Try multiple public CORS proxies in sequence until success
 async function fetchDestinations(url) {
