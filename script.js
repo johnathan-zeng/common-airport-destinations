@@ -28,19 +28,14 @@ function parseHtml(html) {
     const allDests = new Set();
 
     tables.forEach(table => {
-        // Check table caption text for "Passenger"
-        const caption = table.querySelector("caption");
-        const captionText = caption ? caption.textContent.toLowerCase() : "";
+        const headingText = getNearestHeadingText(table);
 
-        // If caption doesn't mention "passenger", check for preceding heading
-        if (!captionText.includes("passenger")) {
-            if (!caption && !hasPassengerHeading(table)) return;
-            if (caption && !captionText.includes("passenger")) return;
-        }
+        // Only parse tables under a heading containing "Passenger"
+        if (!headingText || !headingText.toLowerCase().includes("passenger")) return;
 
         const rows = table.querySelectorAll("tr");
         rows.forEach((row, idx) => {
-            if (idx === 0) return; // Skip header row
+            if (idx === 0) return; // skip header
             const cols = row.querySelectorAll("td");
             if (cols.length < 2) return;
 
@@ -49,7 +44,7 @@ function parseHtml(html) {
 
             let destText = cols[1].textContent;
 
-            // Remove ALL bracketed citations and references
+            // Clean up references and notes
             destText = destText.replace(/\s*\[\d+\]\s*/g, ', ');
             destText = destText.replace(/\s*\([^)]*\)\s*/g, ' ');
 
@@ -69,26 +64,22 @@ function parseHtml(html) {
         });
     });
 
-    if (allDests.size > 0) {
-        airlineMap.set("__ALL__", allDests);
-    }
+    if (allDests.size > 0) airlineMap.set("__ALL__", allDests);
     return airlineMap;
 }
 
-// Helper: check if a previous sibling heading contains "Passenger"
-function hasPassengerHeading(table) {
+// Helper: finds the closest previous heading element before a table
+function getNearestHeadingText(table) {
     let el = table.previousElementSibling;
-    let checkCount = 0;
-    
-    while (el && checkCount < 5) { // Limit search to avoid infinite loops
-        if (/^h[1-6]$/i.test(el.tagName)) {
-            if (el.textContent.toLowerCase().includes("passenger")) return true;
-            else return false;
+    let count = 0;
+    while (el && count < 5) {
+        if (/^H[1-6]$/i.test(el.tagName)) {
+            return el.textContent.trim();
         }
         el = el.previousElementSibling;
-        checkCount++;
+        count++;
     }
-    return false;
+    return "";
 }
 
 async function fetchDestinations(url) {
