@@ -41,34 +41,39 @@ function parseHtml(html) {
   const airlineMap = new Map();
   const allDests = new Set();
 
-  tables.forEach((table, i) => {
+  tables.forEach((table, index) => {
     const caption = table.querySelector("caption");
     const captionText = caption ? caption.textContent.toLowerCase() : "";
 
-    if (!captionText.includes("passenger") && !hasPassengerHeading(table)) {
-      console.log(`Skipping table ${i} - no 'passenger' caption or heading`);
+    // Allow through all tables with at least 2 columns
+    const rows = table.querySelectorAll("tr");
+    if (!rows.length || rows[0].children.length < 2) {
+      console.log(`Skipping table ${index} - too few columns`);
       return;
     }
 
-    const rows = table.querySelectorAll("tr");
-    console.log(`Processing table ${i} with ${rows.length} rows`);
+    console.log(`Parsing table ${index}: "${captionText || '[no caption]'}"`);
 
-    rows.forEach((row, idx) => {
-      if (idx === 0) return; // skip header
+    rows.forEach((row, rowIndex) => {
+      if (rowIndex === 0) return; // skip header
 
       const cols = row.querySelectorAll("td");
       if (cols.length < 2) return;
 
       const airline = cols[0].textContent.trim();
-      if (!airline || airline.length < 2) return;
-
       let destText = cols[1].textContent || "";
 
+      if (!airline || airline.length < 2) return;
+
+      console.log(`Row ${rowIndex} Airline: ${airline}`);
+      console.log(`Dest raw text: ${destText}`);
+
+      // Clean up and extract destinations
       destText = destText
-        .replace(/\[\d+\]/g, '')
-        .replace(/\([^)]+\)/g, '')
-        .replace(/–/g, '-')
-        .replace(/\s{2,}/g, ' ')
+        .replace(/\[\d+\]/g, '')              // remove references like [1]
+        .replace(/\([^)]+\)/g, '')            // remove (notes)
+        .replace(/–/g, '-')                   // normalize dash
+        .replace(/\s{2,}/g, ' ')              // collapse spaces
         .trim();
 
       const dests = destText
@@ -89,16 +94,14 @@ function parseHtml(html) {
           airlineMap.get(airline).add(d);
           allDests.add(d);
         });
-        console.log(`Table ${i} Row ${idx}: Airline '${airline}' with destinations: ${dests.join(", ")}`);
       }
     });
   });
 
+  console.log(`Finished parsing tables. Found destinations for ${airlineMap.size} airlines.`);
+
   if (allDests.size > 0) {
     airlineMap.set("__ALL__", allDests);
-    console.log(`Collected total unique destinations: ${allDests.size}`);
-  } else {
-    console.warn("No passenger destination data extracted from HTML");
   }
 
   return airlineMap;
