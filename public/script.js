@@ -5,15 +5,16 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-// Search Wikipedia API to get airport article URL
+// Search Wikipedia API to get airport article URL (supports CORS)
 async function getWikipediaUrl(code) {
-  console.log(`Searching Wikipedia for airport code: ${code}`);
   const query = `airport ${code}`;
   const apiUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*`;
 
   try {
+    console.log(`Searching Wikipedia for airport code: ${code}`);
     const res = await fetch(apiUrl);
     if (!res.ok) throw new Error(`Wikipedia API error: ${res.status}`);
+
     const json = await res.json();
     const firstResult = json.query?.search?.[0];
 
@@ -27,94 +28,115 @@ async function getWikipediaUrl(code) {
   }
 }
 
-// Parse Wikipedia HTML to extract passenger-only airline tables
+// Check if a heading before the table mentions "passenger"
+function hasPassengerHeading(table) {
+  let el = table.previousElementSibling;
+  let count = 0;
+  while (el && count < 5) {
+    if (/^H[1-6]$/i.test(el.tagName)) {
+      return el.textContent.toLowerCase().includes("passenger");
+    }
+    el = el.previousElementSibling;
+    count++;
+  }
+  return false;
+}
+
+// Parse Wikipedia HTML, extract passenger destination tables only
 function parseHtml(html) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, "text/html");
+  const tables = doc.querySelectorAll("table.wikitable");
+  console.log(`Parsing HTML: found ${tables.length} wikitable elements`);
+
   const airlineMap = new Map();
   const allDests = new Set();
 
-  const headings = Array.from(doc.querySelectorAll("h2, h3, h4, h5, h6"));
-  for (let i = 0; i < headings.length; i++) {
-    const headingText = headings[i].textContent.toLowerCase();
+  tables.forEach((table, index) => {
+    const caption = table.querySelector("caption");
+    const captionText = caption ? caption.textContent.toLowerCase() : "";
+    console.log(`Table ${index} caption: "${captionText}"`);
 
-    if (headingText.includes("airlines and destinations")) {
-      for (let j = i + 1; j < headings.length; j++) {
-        const subHeadingText = headings[j].textContent.toLowerCase();
-
-        if (subHeadingText.includes("cargo") || subHeadingText.includes("freight")) break;
-
-        if (subHeadingText.includes("passenger")) {
-          let el = headings[j].nextElementSibling;
-          while (el && !/^H[2-6]$/.test(el.tagName)) {
-            if (el.tagName === "TABLE" && el.classList.contains("wikitable")) {
-              processTable(el, airlineMap, allDests);
-            }
-            el = el.nextElementSibling;
-          }
-          break;
-        }
+    if (!captionText.includes("passenger")) {
+      if (hasPassengerHeading(table)) {
+        console.log(`Table ${index} accepted due to passenger heading`);
+      } else {
+        console.log(`Skipping table ${index} - no 'passenger' caption or heading`);
+        return;
       }
-      break;
+    } else {
+      console.log(`Table ${index} accepted due to passenger caption`);
     }
-  }
+
+    const rows = table.querySelectorAll("tr");
+    console.log(`Table ${index} has ${rows.length} rows`);
+
+    rows.forEach((row, idx) => {
+      if (idx === 0) return; // skip header row
+
+      const cols = row.querySelectorAll("td");
+      if (cols.length < 2) {
+        console.log(`Table ${index} row ${idx} skipped - not enough columns`);
+        return;
+      }
+
+      const airline = cols[0].textContent.trim();
+      if (!airline || airline.length < 2) {
+        console.log(`Table ${index} row ${idx} skipped - invalid airline name`);
+        return;
+      }
+
+      let destText = cols[1].textContent || "";
+
+      destText = destText
+        .replace(/\[\d+\]/g, '') // remove references like [1]
+        .replace(/\([^)]+\)/g, '') // remove text in parentheses
+        .replace(/–/g, '-') // replace special dashes
+        .replace(/\s{2,}/g, ' ') // collapse spaces
+        .trim();
+
+      const dests = destText
+        .split(/[\n,;·•]/)
+        .map(d => d.trim())
+        .filter(d =>
+          d.length >= 3 &&
+          d.length < 50 &&
+          !/^\d+$/.test(d) &&
+          !/[0-9]{3,}/.test(d) &&
+          !/^\d{2,}[a-z]?$/i.test(d) &&
+          !/^(and|or|also|via|seasonal|charter|cargo|freight|terminated|suspended)$/i.test(d)
+        );
+
+      if (dests.length > 0) {
+        if (!airlineMap.has(airline)) airlineMap.set(airline, new Set());
+        dests.forEach(d => {
+          airlineMap.get(airline).add(d);
+          allDests.add(d);
+        });
+        console.log(`Table ${index} row ${idx} airline: "${airline}" destinations: ${dests.join(", ")}`);
+      } else {
+        console.log(`Table ${index} row ${idx} airline: "${airline}" - no valid destinations after filtering`);
+      }
+    });
+  });
 
   if (allDests.size > 0) {
     airlineMap.set("__ALL__", allDests);
   }
 
+  console.log(`Total unique destinations extracted: ${allDests.size}`);
+
   return airlineMap;
 }
 
-// Helper to extract destinations from table rows
-function processTable(table, airlineMap, allDests) {
-  const rows = table.querySelectorAll("tr");
-  rows.forEach((row, idx) => {
-    if (idx === 0) return;
-    const cols = row.querySelectorAll("td");
-    if (cols.length < 2) return;
-
-    const airline = cols[0].textContent.trim();
-    if (!airline || airline.length < 2 || /^\d+$/.test(airline)) return;
-
-    let destText = cols[1].textContent || "";
-    destText = destText
-      .replace(/\[\d+\]/g, '')
-      .replace(/\([^)]+\)/g, '')
-      .replace(/–/g, '-')
-      .replace(/\s{2,}/g, ' ')
-      .trim();
-
-    const dests = destText
-      .split(/[\n,;·•]/)
-      .map(d => d.trim())
-      .filter(d =>
-        d.length >= 3 &&
-        d.length < 50 &&
-        !/^\d+$/.test(d) &&
-        !/[0-9]{3,}/.test(d) &&
-        !/^\d{2,}[a-z]?$/i.test(d) &&
-        !/^(and|or|also|via|seasonal|charter|cargo|freight|terminated|suspended|unknown|active|none)$/i.test(d)
-      );
-
-    if (dests.length > 0) {
-      if (!airlineMap.has(airline)) airlineMap.set(airline, new Set());
-      dests.forEach(d => {
-        airlineMap.get(airline).add(d);
-        allDests.add(d);
-      });
-    }
-  });
-}
-
-// Fetch HTML via proxy fallback
+// Try multiple public CORS proxies in sequence until success
 async function fetchDestinations(url) {
   const proxies = [
-    "https://common-airport-destinations.vercel.app/api/proxy?url=",
+    "https://common-airport-destinations.vercel.app/api/proxy?url=", // Your Vercel proxy first
     "https://api.allorigins.win/get?url=",
     "https://corsproxy.io/?",
     "https://api.codetabs.com/v1/proxy?quest=",
-    "https://thingproxy.freeboard.io/fetch/"
+    "https://thingproxy.freeboard.io/fetch/",
   ];
 
   let lastError = null;
@@ -122,7 +144,7 @@ async function fetchDestinations(url) {
   for (const proxy of proxies) {
     try {
       const proxyUrl = proxy + encodeURIComponent(url);
-      console.log(`Trying proxy: ${proxy}`);
+      console.log(`Trying proxy: ${proxyUrl}`);
 
       const res = await fetch(proxyUrl);
       if (!res.ok) throw new Error(`HTTP ${res.status} at proxy: ${proxy}`);
@@ -135,20 +157,22 @@ async function fetchDestinations(url) {
         html = await res.text();
       }
 
+      if (!html || html.length < 100) throw new Error('Empty or invalid response');
+
       const parsed = parseHtml(html);
       if (parsed.size > 0) return parsed;
 
-      throw new Error("No destination data found in page");
+      throw new Error('No destination data found in page');
     } catch (err) {
       console.warn(`Proxy failed (${proxy}): ${err.message}`);
       lastError = err;
     }
   }
 
-  throw new Error(`All proxies failed. Last error: ${lastError?.message || "Unknown error"}`);
+  throw new Error(`All proxies failed. Last error: ${lastError?.message || 'Unknown error'}`);
 }
 
-// Merge and format comparison
+// Merge airline destination sets for comparison
 function mergeAirlines(map1, map2) {
   const airlineSet = new Set([...map1.keys(), ...map2.keys()]);
   const result = [];
@@ -171,6 +195,7 @@ function mergeAirlines(map1, map2) {
     }
   });
 
+  // Move "All Airlines" to the front
   const allIndex = result.findIndex((r) => r.airline === "All Airlines");
   if (allIndex > -1) {
     const [allRow] = result.splice(allIndex, 1);
@@ -184,7 +209,7 @@ function mergeAirlines(map1, map2) {
   });
 }
 
-// Main function to compare
+// Main function to compare destinations
 async function compareDestinations() {
   const code1 = document.getElementById("code1").value.trim().toUpperCase();
   const code2 = document.getElementById("code2").value.trim().toUpperCase();
@@ -193,6 +218,10 @@ async function compareDestinations() {
 
   if (!code1 || !code2) {
     output.innerHTML = `<div class="error">Please enter both airport codes.</div>`;
+    return;
+  }
+  if (code1.length < 3 || code2.length < 3) {
+    output.innerHTML = `<div class="error">Please enter valid airport codes (3+ characters).</div>`;
     return;
   }
   if (code1 === code2) {
@@ -204,14 +233,22 @@ async function compareDestinations() {
   button.disabled = true;
 
   try {
+    // Search Wikipedia for each airport page URL
     const [url1, url2] = await Promise.all([getWikipediaUrl(code1), getWikipediaUrl(code2)]);
-    console.log("Got Wikipedia URLs:");
+
+    console.log(`Got Wikipedia URLs:`);
     console.log(`${code1}: ${url1}`);
     console.log(`${code2}: ${url2}`);
 
     output.innerHTML = `<div class="loading">Fetching destination data...</div>`;
 
+    // Fetch and parse destination tables
     const [map1, map2] = await Promise.all([fetchDestinations(url1), fetchDestinations(url2)]);
+
+    if (map1.size === 0 && map2.size === 0) {
+      output.innerHTML = `<div class="error">No passenger destination data found for either airport.</div>`;
+      return;
+    }
 
     const merged = mergeAirlines(map1, map2);
 
@@ -220,6 +257,7 @@ async function compareDestinations() {
       return;
     }
 
+    // Build and display results table
     let html = `
       <h3>Destination Comparison: ${escapeHtml(code1)} vs ${escapeHtml(code2)}</h3>
       <table>
@@ -249,8 +287,8 @@ async function compareDestinations() {
         </tbody>
       </table>
       <div class="warning">
-        <strong>Note:</strong> Data is sourced from Wikipedia passenger tables.
-        Accuracy depends on how up-to-date Wikipedia content is.
+        <strong>Note:</strong> Data is sourced from Wikipedia passenger destination tables.
+        Results depend on the completeness of Wikipedia data.
       </div>
     `;
 
@@ -263,10 +301,14 @@ async function compareDestinations() {
   }
 }
 
+// Support Enter key to trigger comparison
 document.addEventListener("DOMContentLoaded", () => {
-  document.querySelectorAll("input[type='text']").forEach((input) => {
+  const inputs = document.querySelectorAll("input[type='text']");
+  inputs.forEach((input) => {
     input.addEventListener("keypress", (e) => {
-      if (e.key === "Enter") compareDestinations();
+      if (e.key === "Enter") {
+        compareDestinations();
+      }
     });
   });
 });
