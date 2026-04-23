@@ -7,13 +7,27 @@
   <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
-  <h1>Airport Destination Comparison</h1>
-  <p>Enter two airport codes (ICAO or IATA):</p>
-  <input type="text" id="code1" placeholder="e.g., TFU or ZUTF">
-  <input type="text" id="code2" placeholder="e.g., CTU or ZUUU">
-  <button onclick="compareDestinations()">Compare</button>
-  <div id="output"></div>
+  <div class="page-shell">
+    <div class="toolbar">
+      <label class="theme-picker" for="theme-select">
+        <span>Theme</span>
+        <select id="theme-select" aria-label="Theme preference">
+          <option value="auto">Automatic</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </label>
+    </div>
+
+    <h1>Airport Destination Comparison</h1>
+    <p>Enter two airport codes (ICAO or IATA):</p>
+    <div class="form-row">
+      <input type="text" id="code1" placeholder="e.g., TFU or ZUTF">
+      <input type="text" id="code2" placeholder="e.g., CTU or ZUUU">
+      <button onclick="compareDestinations()">Compare</button>
+    </div>
+    <div id="output"></div>
+  </div>
   <script src="script.js"></script>
 </body>
 </html>
-
