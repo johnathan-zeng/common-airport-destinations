@@ -26,6 +26,12 @@ Then open:
 
 `http://127.0.0.1:4173`
 
+## Online Version
+
+The deployed Vercel app is available at:
+
+[https://common-airport-destinations.vercel.app/](https://common-airport-destinations.vercel.app/)
+
 ## Notes
 
 - Wikipedia page structure varies by airport, so some tables may still need airport-specific cleanup in the future.

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Great Circle Map</title>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body data-page="gcmap">
+  <div class="page-shell">
+    <div class="toolbar">
+      <nav class="page-nav" aria-label="App pages">
+        <a class="page-link" href="./">Compare Airports</a>
+        <a class="page-link" href="matrix.html">Airport Matrix</a>
+        <a class="page-link active" href="gcmap.html">Great Circle Map</a>
+      </nav>
+      <label class="theme-picker" for="theme-select">
+        <span>Theme</span>
+        <select id="theme-select" aria-label="Theme preference">
+          <option value="auto">Automatic</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </label>
+    </div>
+
+    <h1>Great Circle Map</h1>
+    <p>Enter two airport codes to calculate a great-circle route. You can compare the direct path with heuristic detours that avoid regions such as Russian or Middle Eastern airspace.</p>
+    <div class="form-row">
+      <input type="text" id="gcmap-origin" placeholder="e.g., JFK or KJFK">
+      <input type="text" id="gcmap-destination" placeholder="e.g., HND or RJTT">
+      <label class="inline-select">
+        <span>Aircraft</span>
+        <select id="gcmap-aircraft">
+          <option value="b77w">Boeing 777-300ER</option>
+          <option value="b789">Boeing 787-9</option>
+          <option value="b788">Boeing 787-8</option>
+          <option value="b789x">Boeing 787-10</option>
+          <option value="a359">Airbus A350-900</option>
+          <option value="a35k">Airbus A350-1000</option>
+          <option value="a388">Airbus A380-800</option>
+          <option value="a333">Airbus A330-300</option>
+          <option value="b763">Boeing 767-300ER</option>
+          <option value="b738">Boeing 737-800</option>
+          <option value="a320">Airbus A320</option>
+          <option value="e75l">Embraer 175</option>
+        </select>
+      </label>
+      <label class="inline-checkbox">
+        <input type="checkbox" id="gcmap-avoid-russia">
+        <span>Avoid Russian airspace</span>
+      </label>
+      <label class="inline-checkbox">
+        <input type="checkbox" id="gcmap-avoid-middle-east">
+        <span>Avoid Middle East airspace</span>
+      </label>
+      <label class="inline-checkbox">
+        <input type="checkbox" id="gcmap-compare-direct" checked>
+        <span>Compare with direct route</span>
+      </label>
+      <button id="gcmap-button" onclick="buildGreatCircleRoute()">Calculate Route</button>
+    </div>
+    <div id="gcmap-output"></div>
+  </div>
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+  <script src="data/russia-boundary.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

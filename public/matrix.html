@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Airport Airline Matrix</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body data-page="matrix">
+  <div class="page-shell">
+    <div class="toolbar">
+      <nav class="page-nav" aria-label="App pages">
+        <a class="page-link" href="./">Compare Airports</a>
+        <a class="page-link active" href="matrix.html">Airport Matrix</a>
+        <a class="page-link" href="gcmap.html">Great Circle Map</a>
+      </nav>
+      <label class="theme-picker" for="theme-select">
+        <span>Theme</span>
+        <select id="theme-select" aria-label="Theme preference">
+          <option value="auto">Automatic</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </label>
+    </div>
+
+    <h1>Airport Airline Matrix</h1>
+    <p>Enter one airport code (ICAO or IATA) to build a destination matrix where rows are destinations, columns are airlines, and marked cells indicate service.</p>
+    <div class="form-row">
+      <input type="text" id="matrix-code" placeholder="e.g., HND or RJTT">
+      <button id="matrix-button" onclick="buildMatrix()">Build Matrix</button>
+    </div>
+    <div id="matrix-output"></div>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>
