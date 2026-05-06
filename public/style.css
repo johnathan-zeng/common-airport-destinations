@@ -239,7 +239,11 @@ button:disabled {
 }
 
 .results-table-wrap {
-  overflow-x: auto;
+  position: relative;
+  overflow: auto;
+  max-height: min(72vh, calc(100vh - 240px));
+  scrollbar-gutter: stable both-edges;
+  border-radius: 16px;
 }
 
 table {
@@ -476,6 +480,10 @@ table thead th {
   margin-top: 12px;
 }
 
+.filter-toggle-group {
+  margin-top: 12px;
+}
+
 .filter-actions label {
   display: flex;
   flex-direction: column;
@@ -526,6 +534,23 @@ table thead th {
   margin-top: 14px;
   border-top: 1px solid var(--panel-border);
   padding-top: 12px;
+}
+
+.filter-chip-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--panel) 80%, var(--table-header) 20%);
+  color: var(--text);
+  min-height: 40px;
+}
+
+.filter-chip-toggle input {
+  min-width: 0;
+  width: auto;
 }
 
 .filter-airline-details summary {

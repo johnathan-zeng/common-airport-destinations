@@ -55,6 +55,8 @@ const matrixFilterState = {
   maxDestinations: "",
   selectedAirlines: [],
   selectionEnabled: false,
+  showUniqueDestinations: false,
+  showCommonDestinations: false,
 };
 
 let currentComparisonResult = null;
@@ -1391,6 +1393,7 @@ function renderAirlineFilterPanel(options) {
     countLabel,
     getCount,
     title,
+    extraControlsHtml = "",
   } = options;
   const selectedAirlines = new Set(state.selectedAirlines);
   const displayAirlines = airlines.filter((airline) => airline !== "All Airlines");
@@ -1485,6 +1488,7 @@ function renderAirlineFilterPanel(options) {
             <button type="button" class="filter-quick-button" data-filter-prefix="${prefix}" data-airline-action="clear-range">Clear range</button>
             <button type="button" class="filter-quick-button" data-filter-prefix="${prefix}" data-airline-action="reset-filters">Reset filters</button>
           </div>
+          ${extraControlsHtml}
           <details class="filter-airline-details" ${uiState.airlinesOpen ? "open" : ""}>
             <summary>Select airlines</summary>
             <div class="filter-airline-detail-actions">
@@ -1806,6 +1810,27 @@ function buildMatrixData(destinationsMap, visibleAirlines = null) {
   return { airlines, rows };
 }
 
+function filterMatrixRows(rows, airlines, state) {
+  if (!state.showUniqueDestinations && !state.showCommonDestinations) {
+    return rows;
+  }
+
+  return rows.filter((row) => {
+    const isUnique = row.coverage === 1;
+    const isCommon = airlines.length > 0 && row.coverage === airlines.length;
+
+    if (state.showUniqueDestinations && state.showCommonDestinations) {
+      return isUnique || isCommon;
+    }
+
+    if (state.showUniqueDestinations) {
+      return isUnique;
+    }
+
+    return isCommon;
+  });
+}
+
 function sortMatrixRows(rows) {
   const directionMultiplier = matrixSortState.direction === "asc" ? 1 : -1;
   return [...rows].sort((a, b) => {
@@ -1833,14 +1858,24 @@ function renderMatrixResults(code, title, destinationsMap) {
     (airline) => destinationsMap.get(airline)?.size ?? 0
   );
   const { airlines, rows } = buildMatrixData(destinationsMap, visibleAirlines);
-  const sortedRows = sortMatrixRows(rows);
+  const filteredRows = filterMatrixRows(rows, airlines, matrixFilterState);
+  const sortedRows = sortMatrixRows(filteredRows);
+  const destinationModeSummary =
+    matrixFilterState.showUniqueDestinations && matrixFilterState.showCommonDestinations
+      ? "Showing destinations unique to one selected airline or common to all selected airlines"
+      : matrixFilterState.showUniqueDestinations
+        ? "Showing destinations unique to one selected airline"
+        : matrixFilterState.showCommonDestinations
+          ? "Showing destinations common to all selected airlines"
+          : "Showing all destinations for the selected airlines";
 
   let html = `
     <h3>Airline Destination Matrix: ${escapeHtml(code)}</h3>
     <p><strong>${escapeHtml(code)}</strong>: ${escapeHtml(title)}</p>
     <div class="matrix-meta">
       <span>${airlines.length} airlines</span>
-      <span>${rows.length} destinations</span>
+      <span>${filteredRows.length} destinations</span>
+      <span>${escapeHtml(destinationModeSummary)}</span>
     </div>
     ${renderAirlineFilterPanel({
       prefix: "matrix",
@@ -1850,6 +1885,26 @@ function renderMatrixResults(code, title, destinationsMap) {
       countLabel: (count) => `${count} destinations`,
       getCount: (airline) => destinationsMap.get(airline)?.size ?? 0,
       title: "Airline filters",
+      extraControlsHtml: `
+        <div class="filter-panel-row filter-toggle-group">
+          <label class="filter-chip-toggle">
+            <input
+              type="checkbox"
+              id="matrix-show-unique-destinations"
+              ${matrixFilterState.showUniqueDestinations ? "checked" : ""}
+            >
+            <span>Unique to one selected airline</span>
+          </label>
+          <label class="filter-chip-toggle">
+            <input
+              type="checkbox"
+              id="matrix-show-common-destinations"
+              ${matrixFilterState.showCommonDestinations ? "checked" : ""}
+            >
+            <span>Common to all selected airlines</span>
+          </label>
+        </div>
+      `,
     })}
   `;
 
@@ -1857,6 +1912,15 @@ function renderMatrixResults(code, title, destinationsMap) {
     html += `
       <div class="warning">
         <strong>Note:</strong> No airlines match the current filters.
+      </div>
+    `;
+    return html;
+  }
+
+  if (!sortedRows.length) {
+    html += `
+      <div class="warning">
+        <strong>Note:</strong> No destinations match the current airline and destination filters.
       </div>
     `;
     return html;
@@ -1980,6 +2044,26 @@ function bindFilterControls(prefix, state, rerender, getAllAirlines) {
     });
   }
 
+  if (prefix === "matrix") {
+    const uniqueToggle = document.getElementById("matrix-show-unique-destinations");
+    if (uniqueToggle) {
+      uniqueToggle.addEventListener("change", (event) => {
+        captureFilterUiState(prefix);
+        state.showUniqueDestinations = event.target.checked;
+        rerender();
+      });
+    }
+
+    const commonToggle = document.getElementById("matrix-show-common-destinations");
+    if (commonToggle) {
+      commonToggle.addEventListener("change", (event) => {
+        captureFilterUiState(prefix);
+        state.showCommonDestinations = event.target.checked;
+        rerender();
+      });
+    }
+  }
+
   document
     .querySelectorAll(`[data-filter-prefix="${prefix}"][data-airline-action]`)
     .forEach((button) => {
@@ -2009,6 +2093,10 @@ function bindFilterControls(prefix, state, rerender, getAllAirlines) {
           state.maxDestinations = "";
           state.selectedAirlines = [];
           state.selectionEnabled = false;
+          if (prefix === "matrix") {
+            state.showUniqueDestinations = false;
+            state.showCommonDestinations = false;
+          }
           const queryInput = document.getElementById(`${prefix}-airline-query`);
           if (queryInput) queryInput.value = "";
           syncRangeState(prefix, state);
@@ -2251,6 +2339,8 @@ async function buildMatrix() {
     matrixFilterState.maxDestinations = "";
     matrixFilterState.selectedAirlines = [];
     matrixFilterState.selectionEnabled = false;
+    matrixFilterState.showUniqueDestinations = false;
+    matrixFilterState.showCommonDestinations = false;
     rerenderMatrix();
   } catch (error) {
     console.error(error);
