@@ -3,18 +3,158 @@ const WIKIPEDIA_API_BASE =
 const THEME_STORAGE_KEY = "airport-theme-preference";
 const themeMediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
 const AIRPORT_PAGE_OVERRIDES = {
+  // North America
+  ATL: "Hartsfield–Jackson Atlanta International Airport",
   BOS: "Logan International Airport",
-  KBOS: "Logan International Airport",
-  GMP: "Gimpo International Airport",
-  ICN: "Incheon International Airport",
+  CLT: "Charlotte Douglas International Airport",
+  DEN: "Denver International Airport",
+  DFW: "Dallas/Fort Worth International Airport",
+  DTW: "Detroit Metropolitan Wayne County Airport",
+  EWR: "Newark Liberty International Airport",
+  IAH: "George Bush Intercontinental Airport",
   JFK: "John F. Kennedy International Airport",
-  KGMP: "Gimpo International Airport",
-  KICN: "Incheon International Airport",
-  KJFK: "John F. Kennedy International Airport",
+  LAS: "Harry Reid International Airport",
+  LAX: "Los Angeles International Airport",
   LGA: "LaGuardia Airport",
+  MCO: "Orlando International Airport",
+  MDW: "Midway International Airport",
+  MIA: "Miami International Airport",
+  MSP: "Minneapolis–Saint Paul International Airport",
+  ORD: "O'Hare International Airport",
+  PHL: "Philadelphia International Airport",
+  PHX: "Phoenix Sky Harbor International Airport",
+  SEA: "Seattle–Tacoma International Airport",
+  SFO: "San Francisco International Airport",
+  SLC: "Salt Lake City International Airport",
+  YUL: "Montréal–Trudeau International Airport",
+  YVR: "Vancouver International Airport",
+  YYZ: "Toronto Pearson International Airport",
+  KATL: "Hartsfield–Jackson Atlanta International Airport",
+  KBOS: "Logan International Airport",
+  KCLT: "Charlotte Douglas International Airport",
+  KDEN: "Denver International Airport",
+  KDFW: "Dallas/Fort Worth International Airport",
+  KDTW: "Detroit Metropolitan Wayne County Airport",
+  KEWR: "Newark Liberty International Airport",
+  KIAH: "George Bush Intercontinental Airport",
+  KJFK: "John F. Kennedy International Airport",
+  KLAS: "Harry Reid International Airport",
+  KLAX: "Los Angeles International Airport",
   KLGA: "LaGuardia Airport",
+  KMCO: "Orlando International Airport",
+  KMDW: "Midway International Airport",
+  KMIA: "Miami International Airport",
+  KMSP: "Minneapolis–Saint Paul International Airport",
+  KORD: "O'Hare International Airport",
+  KPHL: "Philadelphia International Airport",
+  KPHX: "Phoenix Sky Harbor International Airport",
+  KSEA: "Seattle–Tacoma International Airport",
+  KSFO: "San Francisco International Airport",
+  KSLC: "Salt Lake City International Airport",
+  // South America
+  EZE: "Ministro Pistarini International Airport",
+  GIG: "Rio de Janeiro–Galeão International Airport",
+  GRU: "São Paulo/Guarulhos International Airport",
+  MEX: "Mexico City International Airport",
+  // Europe
+  AMS: "Amsterdam Airport Schiphol",
+  ARN: "Stockholm Arlanda Airport",
+  BCN: "Barcelona–El Prat Airport",
+  BRU: "Brussels Airport",
+  CDG: "Charles de Gaulle Airport",
+  CPH: "Copenhagen Airport",
+  FCO: "Leonardo da Vinci–Fiumicino Airport",
+  FRA: "Frankfurt Airport",
+  GMP: "Gimpo International Airport",
+  HEL: "Helsinki Airport",
+  LGW: "Gatwick Airport",
+  LHR: "Heathrow Airport",
+  LIN: "Linate Airport",
+  MAD: "Adolfo Suárez Madrid–Barajas Airport",
+  MUC: "Munich Airport",
+  MXP: "Milan Malpensa Airport",
+  ORY: "Orly Airport",
+  OSL: "Oslo Airport, Gardermoen",
+  STN: "London Stansted Airport",
+  VIE: "Vienna International Airport",
+  ZRH: "Zurich Airport",
+  EHAM: "Amsterdam Airport Schiphol",
+  EGLL: "Heathrow Airport",
+  EGKK: "Gatwick Airport",
+  EGSS: "London Stansted Airport",
+  LFPG: "Charles de Gaulle Airport",
+  LFPO: "Orly Airport",
+  EDDF: "Frankfurt Airport",
+  EDDM: "Munich Airport",
+  LEMD: "Adolfo Suárez Madrid–Barajas Airport",
+  LEBL: "Barcelona–El Prat Airport",
+  LIRF: "Leonardo da Vinci–Fiumicino Airport",
+  LIMC: "Milan Malpensa Airport",
+  LSZH: "Zurich Airport",
+  LOWW: "Vienna International Airport",
+  EBBR: "Brussels Airport",
+  EKCH: "Copenhagen Airport",
+  ESSA: "Stockholm Arlanda Airport",
+  EFHK: "Helsinki Airport",
+  ENGM: "Oslo Airport, Gardermoen",
+  // Middle East & Africa
+  ADD: "Addis Ababa Bole International Airport",
+  AUH: "Abu Dhabi International Airport",
+  CAI: "Cairo International Airport",
+  CMN: "Mohammed V International Airport",
+  DME: "Domodedovo International Airport",
+  DOH: "Hamad International Airport",
+  DXB: "Dubai International Airport",
+  JNB: "O.R. Tambo International Airport",
+  NBO: "Jomo Kenyatta International Airport",
+  SVO: "Sheremetyevo International Airport",
+  OMDB: "Dubai International Airport",
+  OMAA: "Abu Dhabi International Airport",
+  OTHH: "Hamad International Airport",
+  // Asia-Pacific
+  BKK: "Suvarnabhumi Airport",
+  CAN: "Guangzhou Baiyun International Airport",
+  CGK: "Soekarno-Hatta International Airport",
+  DMK: "Don Mueang International Airport",
+  HKG: "Hong Kong International Airport",
+  HND: "Tokyo International Airport",
+  ICN: "Incheon International Airport",
+  ITM: "Osaka International Airport",
+  KIX: "Kansai International Airport",
+  KUL: "Kuala Lumpur International Airport",
+  NRT: "Narita International Airport",
+  PEK: "Beijing Capital International Airport",
+  PKX: "Beijing Daxing International Airport",
+  PVG: "Shanghai Pudong International Airport",
+  SHA: "Shanghai Hongqiao International Airport",
+  SIN: "Singapore Changi Airport",
+  SZX: "Shenzhen Bao'an International Airport",
+  AKL: "Auckland Airport",
+  MEL: "Melbourne Airport",
+  SYD: "Sydney Airport",
+  VHHH: "Hong Kong International Airport",
+  RJTT: "Tokyo International Airport",
+  RJAA: "Narita International Airport",
+  RJBB: "Kansai International Airport",
+  RJOO: "Osaka International Airport",
   RKSI: "Incheon International Airport",
   RKSS: "Gimpo International Airport",
+  ZBAA: "Beijing Capital International Airport",
+  ZBAD: "Beijing Daxing International Airport",
+  ZGSZ: "Shenzhen Bao'an International Airport",
+  ZGGG: "Guangzhou Baiyun International Airport",
+  ZSPD: "Shanghai Pudong International Airport",
+  ZSSS: "Shanghai Hongqiao International Airport",
+  WSSS: "Singapore Changi Airport",
+  VTBS: "Suvarnabhumi Airport",
+  VTBD: "Don Mueang International Airport",
+  WMKK: "Kuala Lumpur International Airport",
+  WIII: "Soekarno-Hatta International Airport",
+  NZAA: "Auckland Airport",
+  YMML: "Melbourne Airport",
+  YSSY: "Sydney Airport",
+  KGMP: "Gimpo International Airport",
+  KICN: "Incheon International Airport",
 };
 const AIRCRAFT_PROFILES = {
   a320: { label: "Airbus A320", cruiseKmh: 828 },
@@ -1285,6 +1425,11 @@ function estimateRouteHours(routePlan, aircraftCode) {
   return totalDistanceKm / aircraft.cruiseKmh;
 }
 
+function formatFetchedAt(timestamp) {
+  if (!timestamp) return "";
+  return new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
 function formatDurationHours(hours) {
   const totalMinutes = Math.round(hours * 60);
   const wholeHours = Math.floor(totalMinutes / 60);
@@ -1673,6 +1818,7 @@ function renderComparisonMatrixResults(
     </div>
     <div class="warning">
       <strong>Note:</strong> Rows are destinations, columns are airports, and a filled cell indicates that airport has service to that destination.
+      Data sourced from <a href="https://en.wikipedia.org" target="_blank" rel="noopener">Wikipedia</a>${escapeHtml(currentComparisonResult?.fetchedAt ? ` · Fetched at ${formatFetchedAt(currentComparisonResult.fetchedAt)}` : "")}.
     </div>
   `;
 
@@ -1760,12 +1906,17 @@ function renderComparisonResults(code1, code2, title1, title2, merged) {
     }
   );
 
+  const fetchedAtLabel = currentComparisonResult?.fetchedAt
+    ? ` · Fetched at ${formatFetchedAt(currentComparisonResult.fetchedAt)}`
+    : "";
+
   html += `
         </tbody>
       </table>
     </div>
     <div class="warning">
       <strong>Note:</strong> Results come from Wikipedia destination tables and can vary by page completeness.
+      Data sourced from <a href="https://en.wikipedia.org" target="_blank" rel="noopener">Wikipedia</a>${escapeHtml(fetchedAtLabel)}.
     </div>
   `;
 
@@ -1972,12 +2123,17 @@ function renderMatrixResults(code, title, destinationsMap) {
     html += `</tr>`;
   });
 
+  const fetchedAtLabel = currentMatrixResult?.fetchedAt
+    ? ` · Fetched at ${formatFetchedAt(currentMatrixResult.fetchedAt)}`
+    : "";
+
   html += `
         </tbody>
       </table>
     </div>
     <div class="warning">
       <strong>Note:</strong> Rows are destinations, columns are airlines, and a filled cell indicates that airline serves that destination.
+      Data sourced from <a href="https://en.wikipedia.org" target="_blank" rel="noopener">Wikipedia</a>${escapeHtml(fetchedAtLabel)}.
     </div>
   `;
 
@@ -2294,6 +2450,7 @@ async function compareDestinations() {
       destinations1: airport1.destinations,
       destinations2: airport2.destinations,
       merged,
+      fetchedAt: Date.now(),
     };
     comparisonFilterState.query = "";
     comparisonFilterState.minDestinations = "";
@@ -2333,6 +2490,7 @@ async function buildMatrix() {
       code,
       title: airport.title,
       destinationsMap: airport.destinations,
+      fetchedAt: Date.now(),
     };
     matrixFilterState.query = "";
     matrixFilterState.minDestinations = "";
