@@ -201,6 +201,7 @@ const matrixFilterState = {
 
 let currentComparisonResult = null;
 let currentMatrixResult = null;
+const destinationCache = new Map();
 let comparisonViewMode = "table";
 const filterUiState = {
   comparison: {
@@ -657,6 +658,10 @@ function parseHtml(html) {
 }
 
 async function fetchDestinationsForCode(code) {
+  if (destinationCache.has(code)) {
+    return destinationCache.get(code);
+  }
+
   const { title, html } = await resolveAirportPage(code);
   const destinations = parseHtml(html);
 
@@ -664,7 +669,9 @@ async function fetchDestinationsForCode(code) {
     throw new Error(`No passenger destination tables were found on "${title}"`);
   }
 
-  return { title, destinations };
+  const result = { title, destinations };
+  destinationCache.set(code, result);
+  return result;
 }
 
 function normalizeLongitude(lon) {
@@ -2458,6 +2465,7 @@ async function compareDestinations() {
     comparisonFilterState.selectedAirlines = [];
     comparisonFilterState.selectionEnabled = false;
     rerenderComparison();
+    syncUrlParams();
   } catch (error) {
     console.error(error);
     output.innerHTML = `<div class="error">Error: ${escapeHtml(error.message)}</div>`;
@@ -2500,6 +2508,7 @@ async function buildMatrix() {
     matrixFilterState.showUniqueDestinations = false;
     matrixFilterState.showCommonDestinations = false;
     rerenderMatrix();
+    syncUrlParams();
   } catch (error) {
     console.error(error);
     output.innerHTML = `<div class="error">Error: ${escapeHtml(error.message)}</div>`;
@@ -2576,11 +2585,73 @@ async function buildGreatCircleRoute() {
       avoidedPlan && options.compareDirect ? [directPlan, avoidedPlan] : [avoidedPlan ?? directPlan],
       options.avoidRegions
     );
+    syncUrlParams();
   } catch (error) {
     console.error(error);
     output.innerHTML = `<div class="error">Error: ${escapeHtml(error.message)}</div>`;
   } finally {
     button.disabled = false;
+  }
+}
+
+function syncUrlParams() {
+  const page = document.body.dataset.page;
+  const params = new URLSearchParams();
+
+  if (page === "matrix") {
+    const code = document.getElementById("matrix-code")?.value.trim();
+    if (code) params.set("code", code);
+  } else if (page === "gcmap") {
+    const origin = document.getElementById("gcmap-origin")?.value.trim();
+    const dest = document.getElementById("gcmap-destination")?.value.trim();
+    if (origin) params.set("from", origin);
+    if (dest) params.set("to", dest);
+  } else {
+    const code1 = document.getElementById("code1")?.value.trim();
+    const code2 = document.getElementById("code2")?.value.trim();
+    if (code1) params.set("a", code1);
+    if (code2) params.set("b", code2);
+  }
+
+  const newUrl = `${location.pathname}${params.toString() ? `?${params}` : ""}`;
+  history.replaceState(null, "", newUrl);
+}
+
+function loadUrlParams() {
+  const page = document.body.dataset.page;
+  const params = new URLSearchParams(location.search);
+
+  if (page === "matrix") {
+    const code = params.get("code");
+    const input = document.getElementById("matrix-code");
+    if (code && input) {
+      input.value = code;
+      buildMatrix();
+    }
+  } else if (page === "gcmap") {
+    const from = params.get("from");
+    const to = params.get("to");
+    if (from) {
+      const el = document.getElementById("gcmap-origin");
+      if (el) el.value = from;
+    }
+    if (to) {
+      const el = document.getElementById("gcmap-destination");
+      if (el) el.value = to;
+    }
+    if (from && to) buildGreatCircleRoute();
+  } else {
+    const a = params.get("a");
+    const b = params.get("b");
+    if (a) {
+      const el = document.getElementById("code1");
+      if (el) el.value = a;
+    }
+    if (b) {
+      const el = document.getElementById("code2");
+      if (el) el.value = b;
+    }
+    if (a && b) compareDestinations();
   }
 }
 
@@ -2604,6 +2675,8 @@ function initializePage() {
       }
     });
   });
+
+  loadUrlParams();
 }
 
 function updateComparisonViewButtons() {
